@@ -70,6 +70,13 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- Cliente MQTT Eclipse Paho (consumidor de sensores Node-RED) -->
+        <dependency>
+            <groupId>org.eclipse.paho</groupId>
+            <artifactId>org.eclipse.paho.client.mqttv3</artifactId>
+            <version>1.2.5</version>
+        </dependency>
+
         <dependency>
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
