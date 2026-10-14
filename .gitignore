@@ -1,0 +1,33 @@
+# ============================================================
+# Museo Smart - .gitignore raiz (monorepo)
+# Protege secretos y artefactos generados en todos los modulos.
+# ============================================================
+
+# --- Entorno / secretos (NUNCA versionar) ---
+.env
+.env.*
+!.env.example
+*.local
+
+# --- Java / Maven ---
+target/
+!**/.mvn/wrapper/maven-wrapper.jar
+
+# --- Node / frontend ---
+node_modules/
+dist/
+dist-ssr/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# --- IDE / OS ---
+.idea/
+*.iml
+.vscode/
+.DS_Store
+Thumbs.db
+
+# --- Docker / datos persistentes locales ---
+docker/data/
