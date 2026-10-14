@@ -31,3 +31,5 @@ Thumbs.db
 
 # --- Docker / datos persistentes locales ---
 docker/data/
+# Hash de credenciales MQTT generado en runtime (nunca versionar).
+docker/mosquitto/config/passwd

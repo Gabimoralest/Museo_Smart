@@ -1,0 +1,150 @@
+# ============================================================
+# Museo_Smart - Infraestructura IoT local (Docker Compose)
+# ------------------------------------------------------------
+# Servicios: Node-RED, Mosquitto (MQTT), Redis, InfluxDB.
+# PostgreSQL y Spring Boot NO se incluyen (se ejecutan fuera de Docker).
+#
+# Uso desde PowerShell (desde la carpeta docker/):
+#   Copy-Item .env.example .env      # 1) crear .env y ajustar valores
+#   docker compose config            # 2) validar
+#   docker compose up -d             # 3) arrancar
+#   docker compose ps                # 4) estado + health
+#   docker compose logs -f           # 5) logs
+#   docker compose down              # 6) detener (conserva volumenes)
+#
+# NOTA: los puertos de host son configurables en .env para evitar choques con
+# servicios ya instalados en Windows (Node-RED y Mosquitto nativos).
+# ============================================================
+name: museosmart-iot
+
+services:
+
+  # ----------------------------------------------------------
+  # Mosquitto - broker MQTT con autenticacion (usuario/clave)
+  # ----------------------------------------------------------
+  mosquitto:
+    image: eclipse-mosquitto:2.0.20
+    container_name: museosmart-mosquitto
+    restart: unless-stopped
+    entrypoint: ["/mosquitto/entrypoint.sh"]
+    ports:
+      # Solo el puerto MQTT con autenticacion. Sin websockets ni admin.
+      - "${MQTT_HOST_PORT:-1884}:1883"
+    environment:
+      MQTT_USERNAME: ${MQTT_USERNAME}
+      MQTT_PASSWORD: ${MQTT_PASSWORD}
+    volumes:
+      - ./mosquitto/config:/mosquitto/config
+      - ./mosquitto/mosquitto-entrypoint.sh:/mosquitto/entrypoint.sh:ro
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+    networks:
+      - museosmart-iot
+    healthcheck:
+      # Falla hasta que el broker acepta una publicacion autenticada.
+      test: ["CMD", "mosquitto_pub", "-h", "localhost", "-p", "1883",
+             "-u", "${MQTT_USERNAME}", "-P", "${MQTT_PASSWORD}",
+             "-t", "museo/healthcheck", "-m", "ok"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+
+  # ----------------------------------------------------------
+  # Node-RED - simulador IoT (flujos persistentes)
+  # ----------------------------------------------------------
+  nodered:
+    image: nodered/node-red:4.0.9
+    container_name: museosmart-nodered
+    restart: unless-stopped
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    ports:
+      - "${NODERED_HOST_PORT:-1881}:1880"
+    environment:
+      TZ: ${TZ:-America/Bogota}
+      NODE_RED_ENABLE_PROJECTS: "false"
+      FLOWS: flows.json
+    volumes:
+      - nodered_data:/data
+      - ./nodered:/data-import:ro
+    networks:
+      - museosmart-iot
+    healthcheck:
+      test: ["CMD", "node", "-e",
+             "require('http').get('http://localhost:1880/',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # ----------------------------------------------------------
+  # Redis - estado actual de sensores (incluye persistencia AOF)
+  # ----------------------------------------------------------
+  redis:
+    image: redis:7.4.1
+    container_name: museosmart-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD}"]
+    ports:
+      - "${REDIS_HOST_PORT:-6380}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - museosmart-iot
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ----------------------------------------------------------
+  # InfluxDB 2.x - historico de mediciones ambientales
+  # Bucket con retencion de 90 dias.
+  # ----------------------------------------------------------
+  influxdb:
+    image: influxdb:2.7.11
+    container_name: museosmart-influxdb
+    restart: unless-stopped
+    ports:
+      - "${INFLUX_HOST_PORT:-8087}:8086"
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: ${INFLUX_USERNAME}
+      DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUX_PASSWORD}
+      DOCKER_INFLUXDB_INIT_ORG: ${INFLUX_ORG}
+      DOCKER_INFLUXDB_INIT_BUCKET: ${INFLUX_BUCKET}
+      DOCKER_INFLUXDB_INIT_RETENTION: 90d
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUX_TOKEN}
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+      - influxdb_config:/etc/influxdb2
+    networks:
+      - museosmart-iot
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8086/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+volumes:
+  mosquitto_data:
+    name: museosmart_mosquitto_data
+  mosquitto_log:
+    name: museosmart_mosquitto_log
+  nodered_data:
+    name: museosmart_nodered_data
+  redis_data:
+    name: museosmart_redis_data
+  influxdb_data:
+    name: museosmart_influxdb_data
+  influxdb_config:
+    name: museosmart_influxdb_config
+
+networks:
+  museosmart-iot:
+    name: museosmart-iot
+    driver: bridge
