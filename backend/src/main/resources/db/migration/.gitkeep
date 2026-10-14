@@ -1,0 +1,2 @@
+# Mantiene esta carpeta en el repositorio.
+# Aqui se colocaran las migraciones Flyway (V<version>__<descripcion>.sql).
