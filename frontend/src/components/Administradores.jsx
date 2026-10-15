@@ -133,6 +133,7 @@ export default function Administradores({ sesion: _sesion }) {
   const [admins, setAdmins] = useState([])
   const [adminSeleccionadoId, setAdminSeleccionadoId] = useState(null)
   const [drawerAbierto, setDrawerAbierto] = useState(true)
+  const detalleRef = useRef(null)
 
   // Estado de la consulta real al backend.
   const [cargando, setCargando] = useState(true)
@@ -229,6 +230,18 @@ export default function Administradores({ sesion: _sesion }) {
     () => admins.find((a) => a.id === adminSeleccionadoId) || adminsFiltrados[0] || null,
     [admins, adminSeleccionadoId, adminsFiltrados],
   )
+
+  const tieneDrawer = drawerAbierto && Boolean(adminSeleccionado)
+
+  const seleccionarAdmin = (item) => {
+    setAdminSeleccionadoId(item.id)
+    setDrawerAbierto(true)
+    if (typeof window !== 'undefined' && window.innerWidth <= 1100) {
+      setTimeout(() => {
+        detalleRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+      }, 50)
+    }
+  }
 
   const abrirCrear = () => {
     setFormNombre('')
@@ -534,7 +547,7 @@ export default function Administradores({ sesion: _sesion }) {
       </section>
 
       {/* ===================== Layout Principal (Tabla + Detalle) ===================== */}
-      <div className={`admin-layout${drawerAbierto ? ' admin-layout--con-drawer' : ''}`}>
+      <div className={`admin-layout${tieneDrawer ? ' admin-layout--con-drawer' : ''}`}>
         {/* Tabla Lista de Administradores */}
         <article className="admin-tabla-card">
           <header className="admin-tabla-cabecera">
@@ -597,10 +610,7 @@ export default function Administradores({ sesion: _sesion }) {
                     <tr
                       key={item.id}
                       className={activa ? 'fila--activa' : ''}
-                      onClick={() => {
-                        setAdminSeleccionadoId(item.id)
-                        setDrawerAbierto(true)
-                      }}
+                      onClick={() => seleccionarAdmin(item)}
                     >
                       <td>{indiceInicio + index + 1}</td>
                       <td>
@@ -713,8 +723,8 @@ export default function Administradores({ sesion: _sesion }) {
         </article>
 
         {/* Panel lateral: Detalle del Administrador */}
-        {drawerAbierto && adminSeleccionado && (
-          <aside className="admin-detalle-panel" aria-label="Detalle del administrador">
+        {tieneDrawer && (
+          <aside ref={detalleRef} className="admin-detalle-panel" aria-label="Detalle del administrador">
             <header className="admin-detalle__header">
               <div className="admin-detalle__header-izq">
                 <IconoAdmin className="admin-detalle__header-icono" />

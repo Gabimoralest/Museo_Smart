@@ -1,0 +1,439 @@
+/* El visor vive dentro de .pagina-recorrido, que ya aporta el padding. */
+.recorrido {
+  width: 100%;
+}
+
+.recorrido__marco {
+  border: 1px solid var(--color-borde);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: var(--sombra-tarjeta);
+  background: var(--color-fondo-suave);
+}
+
+.recorrido__lienzo {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  min-height: 320px;
+  background: #0d1014;
+  touch-action: none;
+}
+
+.recorrido__lienzo canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  outline: none;
+}
+
+/* ---------- Pantalla completa ---------- */
+
+/* El marco completo es el elemento a pantalla completa: el lienzo llena el
+   espacio disponible y la barra de controles se mantiene visible encima. */
+.recorrido__marco--completa,
+.recorrido__marco:fullscreen {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  border: none;
+  border-radius: 0;
+  background: #0d1014;
+}
+
+.recorrido__marco--completa .recorrido__lienzo,
+.recorrido__marco:fullscreen .recorrido__lienzo {
+  flex: 1 1 auto;
+  aspect-ratio: auto;
+  height: auto;
+  min-height: 0;
+}
+
+.recorrido__marco--completa .recorrido__controles,
+.recorrido__marco:fullscreen .recorrido__controles {
+  flex: 0 0 auto;
+  background: rgba(10, 13, 17, 0.9);
+}
+
+/* ---------- Portada / aviso ---------- */
+
+.recorrido__portada,
+.recorrido__estado {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 24px;
+  text-align: center;
+  background: radial-gradient(
+    circle at 50% 30%,
+    rgba(214, 178, 106, 0.12),
+    rgba(10, 13, 17, 0.86) 60%
+  );
+}
+
+.recorrido__portada-titulo,
+.recorrido__estado-titulo {
+  font-family: var(--fuente-titulo);
+  font-size: clamp(20px, 2.4vw, 28px);
+  color: var(--color-crema);
+}
+
+.recorrido__portada-texto,
+.recorrido__estado-detalle {
+  max-width: 520px;
+  color: var(--color-texto-tenue);
+  font-size: 14px;
+}
+
+.recorrido__boton {
+  margin-top: 6px;
+  padding: 12px 30px;
+  border-radius: 999px;
+  border: 1px solid rgba(214, 178, 106, 0.65);
+  background: rgba(214, 178, 106, 0.16);
+  color: var(--color-crema);
+  font-weight: 600;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+.recorrido__boton:hover,
+.recorrido__boton:focus-visible {
+  background: rgba(214, 178, 106, 0.3);
+  border-color: var(--color-oro);
+  transform: translateY(-2px);
+}
+
+.recorrido__barra {
+  width: min(320px, 80%);
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(244, 239, 228, 0.12);
+  overflow: hidden;
+}
+
+.recorrido__barra span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-oro-claro), var(--color-oro));
+  transition: width 0.2s ease;
+}
+
+/* ---------- HUD durante el recorrido ---------- */
+
+.recorrido__mira {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border: 1.5px solid rgba(244, 239, 228, 0.85);
+  border-radius: 50%;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+
+.recorrido__ayuda {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 16px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: rgba(10, 13, 17, 0.72);
+  border: 1px solid var(--color-borde);
+  backdrop-filter: blur(6px);
+  font-size: 12px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--color-texto-tenue);
+  pointer-events: none;
+}
+
+/* ---------- Vista previa al pasar el cursor ---------- */
+
+.recorrido__previa {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  max-width: min(280px, 60%);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: rgba(10, 13, 17, 0.78);
+  border: 1px solid var(--color-borde);
+  backdrop-filter: blur(6px);
+  pointer-events: none;
+}
+
+.recorrido__previa-etiqueta {
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--color-oro);
+}
+
+.recorrido__previa-nombre {
+  font-family: var(--fuente-titulo);
+  font-size: 16px;
+  color: var(--color-crema);
+}
+
+.recorrido__previa-sala {
+  font-size: 12px;
+  color: var(--color-texto-tenue);
+}
+
+.recorrido__previa-nota {
+  font-size: 11px;
+  font-style: italic;
+  color: var(--color-texto-tenue);
+}
+
+.recorrido__previa-ayuda {
+  margin-top: 4px;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  color: var(--color-oro-claro);
+}
+
+/* ---------- Ficha ampliada (al hacer clic) ---------- */
+
+.recorrido__ficha-ampliada {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(460px, calc(100% - 32px));
+  max-height: calc(100% - 40px);
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  background: rgba(13, 16, 20, 0.94);
+  border: 1px solid var(--color-borde);
+  box-shadow: var(--sombra-tarjeta);
+  backdrop-filter: blur(10px);
+  overflow: hidden;
+}
+
+.recorrido__ficha-cerrar {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--color-borde);
+  background: rgba(10, 13, 17, 0.7);
+  color: var(--color-crema);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.recorrido__ficha-cerrar:hover,
+.recorrido__ficha-cerrar:focus-visible {
+  background: rgba(214, 178, 106, 0.22);
+  border-color: var(--color-oro);
+}
+
+.recorrido__ficha-contenido {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 22px 24px 16px;
+  overflow-y: auto;
+}
+
+.recorrido__ficha-sala-cabecera {
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--color-oro);
+}
+
+.recorrido__ficha-titulo {
+  margin: 0;
+  font-family: var(--fuente-titulo);
+  font-size: clamp(18px, 2.4vw, 22px);
+  color: var(--color-crema);
+}
+
+.recorrido__campo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.recorrido__campo-etiqueta {
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--color-texto-tenue);
+}
+
+.recorrido__campo-valor {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-texto);
+  white-space: pre-line;
+}
+
+.recorrido__ficha-aviso {
+  margin: 4px 0 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(214, 178, 106, 0.08);
+  border: 1px solid var(--color-borde);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--color-texto-tenue);
+}
+
+.recorrido__ficha-aviso--error {
+  background: rgba(232, 168, 124, 0.1);
+  color: #e8a87c;
+}
+
+.recorrido__ficha-accion {
+  margin: 0 24px 20px;
+  padding: 10px 24px;
+  align-self: flex-start;
+  border-radius: 999px;
+  border: 1px solid rgba(214, 178, 106, 0.55);
+  background: rgba(214, 178, 106, 0.14);
+  color: var(--color-crema);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.recorrido__ficha-accion:hover,
+.recorrido__ficha-accion:focus-visible {
+  background: rgba(214, 178, 106, 0.28);
+  border-color: var(--color-oro);
+}
+
+/* ---------- Barra de controles ---------- */
+
+.recorrido__controles {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--color-borde);
+  background: var(--color-fondo-suave);
+}
+
+.recorrido__controles-aviso {
+  flex: 1 1 auto;
+  margin: 0;
+  font-size: 13px;
+  color: #e8a87c;
+}
+
+.recorrido__pantalla {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(214, 178, 106, 0.45);
+  background: rgba(214, 178, 106, 0.1);
+  color: var(--color-crema);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease,
+    color 0.2s ease;
+}
+
+.recorrido__pantalla:hover:not(:disabled),
+.recorrido__pantalla:focus-visible:not(:disabled) {
+  background: rgba(214, 178, 106, 0.22);
+  border-color: var(--color-oro);
+  transform: translateY(-1px);
+}
+
+.recorrido__pantalla:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.recorrido__pantalla-icono {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ---------- Nota inferior ---------- */
+
+.recorrido__nota {
+  margin-top: 16px;
+  font-size: 13px;
+  color: var(--color-texto-tenue);
+}
+
+/* ---------- Adaptación a pantallas pequeñas ---------- */
+
+@media (max-width: 600px) {
+  .recorrido {
+    padding: clamp(40px, 9vw, 56px) 16px;
+  }
+
+  .recorrido__lienzo {
+    aspect-ratio: 4 / 3;
+    min-height: 260px;
+  }
+
+  .recorrido__ayuda {
+    gap: 4px 10px;
+    font-size: 10px;
+  }
+
+  .recorrido__previa {
+    left: 10px;
+    top: 10px;
+    max-width: 70%;
+    padding: 8px 12px;
+  }
+
+  .recorrido__ficha-contenido {
+    padding: 20px 18px 12px;
+  }
+
+  .recorrido__ficha-accion {
+    margin: 0 18px 16px;
+  }
+
+  .recorrido__controles {
+    justify-content: center;
+    padding: 8px 10px;
+  }
+
+  .recorrido__pantalla {
+    padding: 8px 14px;
+    font-size: 13px;
+  }
+}

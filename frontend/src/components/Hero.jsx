@@ -40,7 +40,7 @@ export default function Hero({ onSeleccionarSala }) {
         <div className="hero__centro" id="experiencia">
           <h1 className="hero__titulo">MUSEO SMART</h1>
           <p className="hero__lema">UN VIAJE AL CONOCIMIENTO</p>
-          <a className="boton-explorar" href="#salas">
+          <a className="boton-explorar" href="#/recorrido-virtual">
             <IconoBrujula />
             Explora las salas
           </a>

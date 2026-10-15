@@ -24,3 +24,18 @@ export function listarExhibicionesPublicas(salaId, { signal } = {}) {
     signal,
   })
 }
+
+/**
+ * Lista todas las exhibiciones activas del museo (catálogo público completo).
+ * Se usa para indexar las obras del recorrido 3D por `codigo` en una sola
+ * petición, evitando consultas repetidas al pasar el cursor entre obras.
+ * @param {{signal?: AbortSignal}} [opciones]
+ * @returns {Promise<Array>} ExhibicionResponse[]
+ */
+export function listarTodasExhibicionesPublicas({ signal } = {}) {
+  return solicitarJson('/exhibiciones', {
+    method: 'GET',
+    autenticado: false,
+    signal,
+  })
+}

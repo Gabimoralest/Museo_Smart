@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import Navbar from './components/Navbar'
 import Hero from './components/Hero'
 import Salas from './components/Salas'
@@ -11,15 +11,21 @@ import PanelAdmin from './components/PanelAdmin'
 import { obtenerSesion, limpiarSesion } from './data/sessionService'
 import './App.css'
 
+// El visor 3D (three.js + modelo de ~64 MB) se carga solo al entrar en la ruta
+// del recorrido, para no penalizar la página principal.
+const PaginaRecorrido = lazy(() => import('./components/PaginaRecorrido'))
+
 const RUTA_LOGIN = '#/login'
 const RUTA_RECUPERACION = '#/recuperar'
 const RUTA_ADMIN = '#/admin'
 const RUTA_EXHIBICIONES = '#/admin/exhibiciones'
+const RUTA_RECORRIDO = '#/recorrido-virtual'
 
 const leerRuta = () => {
   const hash = window.location.hash
   if (hash === RUTA_LOGIN) return 'login'
   if (hash === RUTA_RECUPERACION) return 'recuperacion'
+  if (hash === RUTA_RECORRIDO) return 'recorrido'
   if (
     hash === RUTA_ADMIN ||
     hash === RUTA_EXHIBICIONES ||
@@ -92,6 +98,24 @@ export default function App() {
         onVolverAlLogin={() => irA(RUTA_LOGIN)}
         onVolverAlMuseo={volverAlInicio}
       />
+    )
+  }
+
+  if (ruta === 'recorrido') {
+    return (
+      <Suspense
+        fallback={
+          <div className="app">
+            <Navbar onIngresar={abrirIngreso} />
+            <main className="app__principal" />
+          </div>
+        }
+      >
+        <PaginaRecorrido
+          onVolver={volverAlInicio}
+          onIngresar={abrirIngreso}
+        />
+      </Suspense>
     )
   }
 

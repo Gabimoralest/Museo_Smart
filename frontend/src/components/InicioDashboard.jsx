@@ -264,7 +264,7 @@ export default function InicioDashboard({ sesion, onNavegar }) {
 
       {/* ===================== Tarjetas de Estadísticas (datos reales) ===================== */}
       {!cargando && (
-      <section className="inicio-stats" aria-label="Resumen general">
+      <section className={`inicio-stats inicio-stats--${tarjetas.length}`} aria-label="Resumen general">
         {tarjetas.map((item) => (
           <article
             key={item.id}
