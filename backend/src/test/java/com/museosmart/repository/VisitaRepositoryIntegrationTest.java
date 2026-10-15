@@ -58,13 +58,15 @@ class VisitaRepositoryIntegrationTest {
     void registraVisitaNueva() {
         Exhibicion e = unaExhibicionActiva();
         UUID sesion = UUID.randomUUID();
+        long filasAntes = visitaRepository.countByExhibicionId(e.getId());
+        long validasAntes = totalValidasEnRanking(e.getId());
 
         int insertadas = visitaRepository.registrarConDeduplicacion(
                 e.getId(), sesion, Visita.FUENTE_CURSOR, true, OffsetDateTime.now());
 
         assertThat(insertadas).isEqualTo(1);
-        assertThat(visitaRepository.countByExhibicionId(e.getId())).isEqualTo(1);
-        assertThat(visitaRepository.countByExhibicionIdAndValidaTrue(e.getId())).isEqualTo(1);
+        assertThat(visitaRepository.countByExhibicionId(e.getId())).isEqualTo(filasAntes + 1);
+        assertThat(totalValidasEnRanking(e.getId())).isEqualTo(validasAntes + 1);
     }
 
     @Test
@@ -72,6 +74,7 @@ class VisitaRepositoryIntegrationTest {
     void deduplicaMismaVentana() {
         Exhibicion e = unaExhibicionActiva();
         UUID sesion = UUID.randomUUID();
+        long antes = visitaRepository.countByExhibicionId(e.getId());
 
         int primera = visitaRepository.registrarConDeduplicacion(
                 e.getId(), sesion, Visita.FUENTE_CURSOR, true, OffsetDateTime.now());
@@ -80,26 +83,28 @@ class VisitaRepositoryIntegrationTest {
 
         assertThat(primera).isEqualTo(1);
         assertThat(segunda).isZero();
-        assertThat(visitaRepository.countByExhibicionId(e.getId())).isEqualTo(1);
+        assertThat(visitaRepository.countByExhibicionId(e.getId())).isEqualTo(antes + 1);
     }
 
     @Test
     @DisplayName("sesiones anonimas distintas cuentan como interacciones distintas")
     void sesionesDistintasCuentan() {
         Exhibicion e = unaExhibicionActiva();
+        long antes = visitaRepository.countByExhibicionId(e.getId());
 
         visitaRepository.registrarConDeduplicacion(
                 e.getId(), UUID.randomUUID(), Visita.FUENTE_CURSOR, true, OffsetDateTime.now());
         visitaRepository.registrarConDeduplicacion(
                 e.getId(), UUID.randomUUID(), Visita.FUENTE_CURSOR, true, OffsetDateTime.now());
 
-        assertThat(visitaRepository.countByExhibicionId(e.getId())).isEqualTo(2);
+        assertThat(visitaRepository.countByExhibicionId(e.getId())).isEqualTo(antes + 2);
     }
 
     @Test
     @DisplayName("la vista de ranking se proyecta y refleja las visitas validas")
     void rankingReflejaVisitasValidas() {
         Exhibicion e = unaExhibicionActiva();
+        long validasAntes = totalValidasEnRanking(e.getId());
 
         // Una valida y una NO valida: solo la valida debe contar.
         visitaRepository.registrarConDeduplicacion(
@@ -119,7 +124,15 @@ class VisitaRepositoryIntegrationTest {
         assertThat(fila.getTitulo()).isEqualTo(e.getTitulo());
         assertThat(fila.getSalaId()).isEqualTo(e.getSala().getId());
         assertThat(fila.getSalaNombre()).isEqualTo(e.getSala().getNombre());
-        assertThat(fila.getTotalVisitasValidas()).isEqualTo(1L);
+        assertThat(fila.getTotalVisitasValidas()).isEqualTo(validasAntes + 1);
+    }
+
+    /** Visitas validas de la exhibicion segun la vista de ranking (incluye confirmadas). */
+    private long totalValidasEnRanking(Long exhibicionId) {
+        return visitaRepository.findRankingCompleto().stream()
+                .filter(r -> r.getExhibicionId().equals(exhibicionId))
+                .mapToLong(RankingExhibicionView::getTotalVisitasValidas)
+                .sum();
     }
 
     @Test

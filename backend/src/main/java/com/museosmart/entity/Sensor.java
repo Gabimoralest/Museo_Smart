@@ -58,6 +58,15 @@ public class Sensor {
     @Column(name = "descripcion", columnDefinition = "text")
     private String descripcion;
 
+    /**
+     * Ultimo estado de presencia observado por un sensor de categoria
+     * PRESENCIA. {@code null} = sin lectura todavia. Solo lo gestiona la
+     * ingestion MQTT; permite detectar el flanco de subida para contabilizar
+     * una visita por episodio de presencia.
+     */
+    @Column(name = "presencia_actual")
+    private Boolean presenciaActual;
+
     @Column(name = "instalado_en")
     private OffsetDateTime instaladoEn;
 
@@ -133,6 +142,14 @@ public class Sensor {
 
     public void setDescripcion(String descripcion) {
         this.descripcion = descripcion;
+    }
+
+    public Boolean getPresenciaActual() {
+        return presenciaActual;
+    }
+
+    public void setPresenciaActual(Boolean presenciaActual) {
+        this.presenciaActual = presenciaActual;
     }
 
     public OffsetDateTime getInstaladoEn() {

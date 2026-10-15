@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.museosmart.entity.MedicionPendiente;
 import com.museosmart.entity.MensajeIot;
 import com.museosmart.entity.Sensor;
+import com.museosmart.entity.Visita;
 import com.museosmart.iot.MensajeInvalidoException;
 import com.museosmart.iot.MensajeIotValidador;
 import com.museosmart.iot.dto.MensajeAmbientalDto;
@@ -13,6 +14,7 @@ import com.museosmart.repository.MedicionPendienteRepository;
 import com.museosmart.repository.MensajeIotRepository;
 import com.museosmart.repository.SensorRepository;
 import com.museosmart.service.AlertaService;
+import com.museosmart.service.PopularidadService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -20,6 +22,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
@@ -52,6 +55,7 @@ public class MensajeIotService {
     private final SensorRepository sensorRepository;
     private final MensajeIotValidador validador;
     private final AlertaService alertaService;
+    private final PopularidadService popularidadService;
     private final ObjectMapper objectMapper;
 
     public MensajeIotService(MensajeIotRepository mensajeIotRepository,
@@ -59,12 +63,14 @@ public class MensajeIotService {
                              SensorRepository sensorRepository,
                              MensajeIotValidador validador,
                              AlertaService alertaService,
+                             PopularidadService popularidadService,
                              ObjectMapper objectMapper) {
         this.mensajeIotRepository = mensajeIotRepository;
         this.medicionPendienteRepository = medicionPendienteRepository;
         this.sensorRepository = sensorRepository;
         this.validador = validador;
         this.alertaService = alertaService;
+        this.popularidadService = popularidadService;
         this.objectMapper = objectMapper;
     }
 
@@ -151,7 +157,10 @@ public class MensajeIotService {
         MensajePresenciaDto dto = leer(mensaje.getPayload(), MensajePresenciaDto.class);
         validador.validarPresencia(dto);
 
-        Sensor sensor = sensorRepository.findByCodigo(dto.sensorCodigo())
+        // Se bloquea la fila del sensor: serializa la lectura y escritura de
+        // presencia_actual para que un unico episodio de presencia no se
+        // contabilice dos veces ante mensajes concurrentes.
+        Sensor sensor = sensorRepository.findByCodigoConBloqueo(dto.sensorCodigo())
                 .orElseThrow(() -> new MensajeInvalidoException(
                         "sensor desconocido: " + dto.sensorCodigo()));
 
@@ -166,6 +175,33 @@ public class MensajeIotService {
 
         BigDecimal valor = dto.presencia() ? BigDecimal.ONE : BigDecimal.ZERO;
         guardarMedicion(mensaje, sensor, "PRESENCIA", valor.doubleValue(), null, dto.timestamp());
+
+        // Flanco de subida: solo cuando la presencia pasa a activa desde un
+        // estado distinto (false o desconocido) se contabiliza una visita. Las
+        // lecturas periodicas con presencia ya activa no vuelven a contar.
+        boolean hayPresencia = Boolean.TRUE.equals(dto.presencia());
+        boolean flancoSubida = hayPresencia && !Boolean.TRUE.equals(sensor.getPresenciaActual());
+
+        // Se comprueba la actividad de la exhibicion ANTES de delegar en
+        // PopularidadService: asi una exhibicion inactiva no lanza excepcion que
+        // marcaria toda esta transaccion como rollback-only y perderia la
+        // medicion de presencia.
+        if (flancoSubida && sensor.getExhibicion().isActiva()) {
+            // Identidad de visita unica por EPISODIO de presencia, derivada del
+            // mensaje_id que representa la transicion. Es determinista (reprocesar
+            // el mismo mensaje produce la misma identidad, por lo que uq_visita_dedup
+            // lo colapsa) y distinta entre episodios, de modo que dos subidas del
+            // mismo sensor y exhibicion dentro del mismo minuto no colisionan.
+            // No sustituye a la idempotencia de mensaje_iot.mensaje_id ni al flanco:
+            // ambos siguen siendo la primera linea de defensa.
+            UUID sesionEpisodio = UUID.nameUUIDFromBytes(
+                    ("sensor-episodio:" + mensaje.getMensajeId()).getBytes(StandardCharsets.UTF_8));
+            popularidadService.registrarVisita(
+                    sensor.getExhibicion().getId(), sesionEpisodio.toString(), Visita.FUENTE_SENSOR);
+        }
+
+        sensor.setPresenciaActual(hayPresencia);
+        sensorRepository.save(sensor);
     }
 
     private void guardarMedicion(MensajeIot mensaje, Sensor sensor, String metrica,

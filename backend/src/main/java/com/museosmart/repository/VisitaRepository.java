@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -68,4 +69,13 @@ public interface VisitaRepository extends JpaRepository<Visita, Long> {
     long countByExhibicionId(Long exhibicionId);
 
     long countByExhibicionIdAndValidaTrue(Long exhibicionId);
+
+    /**
+     * Elimina las visitas de una sesion anonima concreta. Se usa para limpiar
+     * datos de pruebas de integracion de la base aislada, donde las visitas
+     * creadas por la ingestion IoT se identifican por su sesion derivada del
+     * mensaje que representa la transicion de presencia.
+     */
+    @Transactional
+    long deleteBySesionAnonimaId(UUID sesionAnonimaId);
 }
