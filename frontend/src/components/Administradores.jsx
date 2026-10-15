@@ -13,8 +13,15 @@ import {
   IconoSobre,
   IconoAdvertencia,
   IconoCheck,
+  IconoBloqueo,
 } from './iconos'
-import { listarUsuarios, crearUsuario } from '../data/usuariosApi'
+import {
+  listarUsuarios,
+  crearUsuario,
+  actualizarUsuario,
+  cambiarEstadoUsuario,
+  eliminarUsuario,
+} from '../data/usuariosApi'
 import { ErrorHttp } from '../data/httpClient'
 import './Administradores.css'
 
@@ -101,6 +108,27 @@ function mensajeCreacion(error) {
   return mensajeDeError(error, 'No se pudo crear el administrador. Inténtalo de nuevo.')
 }
 
+// Mensaje específico para edición / cambio de estado / eliminación, con
+// tratamiento del 409 (correo duplicado), 400 (regla de negocio, p. ej.
+// proteger al último SUPERADMIN) y 404.
+function mensajeOperacion(error, porDefecto) {
+  if (error instanceof ErrorHttp) {
+    if (error.estado === 409) {
+      return 'Ya existe un administrador con ese correo electrónico.'
+    }
+    if (error.estado === 404) {
+      return 'El administrador ya no existe. Actualiza la lista.'
+    }
+    if (error.estado === 400) {
+      if (error.erroresValidacion && Object.keys(error.erroresValidacion).length > 0) {
+        return Object.values(error.erroresValidacion).join(' ')
+      }
+      return error.message || 'La operación no está permitida.'
+    }
+  }
+  return mensajeDeError(error, porDefecto)
+}
+
 export default function Administradores({ sesion: _sesion }) {
   const [admins, setAdmins] = useState([])
   const [adminSeleccionadoId, setAdminSeleccionadoId] = useState(null)
@@ -132,12 +160,19 @@ export default function Administradores({ sesion: _sesion }) {
   const [formCorreo, setFormCorreo] = useState('')
   const [formContrasena, setFormContrasena] = useState('')
   const [formRol, setFormRol] = useState('Administrador')
-  const [formEstado, setFormEstado] = useState('Activo')
 
   // Estado del envío de creación.
   const [creando, setCreando] = useState(false)
   const [errorCrear, setErrorCrear] = useState(null)
   const enviandoRef = useRef(false)
+
+  // Estado del envío de edición / cambio de estado / eliminación.
+  const [guardandoEdicion, setGuardandoEdicion] = useState(false)
+  const [errorEditar, setErrorEditar] = useState(null)
+  const [eliminando, setEliminando] = useState(false)
+  const [errorEliminar, setErrorEliminar] = useState(null)
+  const [estadosEnCurso, setEstadosEnCurso] = useState(() => new Set())
+  const operandoRef = useRef(false)
 
   // Carga del listado real desde el backend.
   const cargarAdministradores = useCallback(async (signal) => {
@@ -270,47 +305,120 @@ export default function Administradores({ sesion: _sesion }) {
     setFormNombre(objetivo.nombre)
     setFormCorreo(objetivo.correo)
     setFormRol(objetivo.rol)
-    setFormEstado(objetivo.estado)
+    setErrorEditar(null)
     setAdminSeleccionadoId(objetivo.id)
     setModalEditar(true)
   }
 
-  const guardarEdicion = (e) => {
-    e.preventDefault()
-    if (!adminSeleccionado) return
-
-    setAdmins((prev) =>
-      prev.map((a) => {
-        if (a.id === adminSeleccionado.id) {
-          return {
-            ...a,
-            nombre: formNombre.trim(),
-            avatar: formNombre.trim().charAt(0).toUpperCase(),
-            correo: formCorreo.trim(),
-            rol: formRol,
-            esSuperAdmin: formRol === 'SuperAdmin',
-            estado: formEstado,
-            ultimaActualizacion: '14/10/2026 12:30 m.',
-          }
-        }
-        return a
-      }),
-    )
+  const cerrarEditar = () => {
+    if (guardandoEdicion) return
     setModalEditar(false)
+    setErrorEditar(null)
+  }
+
+  const guardarEdicion = async (e) => {
+    e.preventDefault()
+    if (!adminSeleccionado || guardandoEdicion) return
+
+    if (!formNombre.trim() || !formCorreo.trim()) {
+      setErrorEditar('El nombre y el correo son obligatorios.')
+      return
+    }
+
+    setGuardandoEdicion(true)
+    setErrorEditar(null)
+    try {
+      // El backend solo actualiza nombre y correo (el rol no cambia).
+      const actualizado = await actualizarUsuario(adminSeleccionado.id, {
+        nombre: formNombre.trim(),
+        correo: formCorreo.trim(),
+        rolBackend: adminSeleccionado.rolBackend,
+      })
+      setModalEditar(false)
+      setAvisoExito(`Administrador «${actualizado?.nombre || formNombre.trim()}» actualizado correctamente.`)
+      await cargarAdministradores()
+    } catch (error) {
+      setErrorEditar(mensajeOperacion(error, 'No se pudo actualizar el administrador.'))
+    } finally {
+      setGuardandoEdicion(false)
+      setTimeout(() => setAvisoExito(null), 4000)
+    }
+  }
+
+  // Activa o desactiva una cuenta (según su estado actual).
+  const cambiarEstado = async (adm) => {
+    if (!adm || operandoRef.current || estadosEnCurso.has(adm.id)) return
+    if (adm.esSuperAdmin && adm.estadoBackend === 'ACTIVO') {
+      // El backend protege al último SUPERADMIN activo; se evita la llamada
+      // solo si es el único SuperAdmin activo.
+      const superActivos = admins.filter(
+        (a) => a.esSuperAdmin && a.estadoBackend === 'ACTIVO',
+      ).length
+      if (superActivos <= 1) {
+        setAvisoExito(null)
+        setErrorCarga(
+          'No se puede desactivar al último SuperAdmin activo.',
+        )
+        setTimeout(() => setErrorCarga(null), 4000)
+        return
+      }
+    }
+
+    const nuevoEstado = adm.estadoBackend === 'ACTIVO' ? 'INACTIVO' : 'ACTIVO'
+    operandoRef.current = true
+    setEstadosEnCurso((prev) => new Set(prev).add(adm.id))
+    try {
+      const actualizado = await cambiarEstadoUsuario(adm.id, nuevoEstado)
+      setAdmins((prev) =>
+        prev.map((a) => (a.id === adm.id ? { ...a, ...mapearUsuario(actualizado) } : a)),
+      )
+      setAvisoExito(
+        `«${adm.nombre}» ahora está ${actualizado.estado === 'ACTIVO' ? 'activo' : 'inactivo'}.`,
+      )
+    } catch (error) {
+      setAvisoExito(null)
+      setErrorCarga(mensajeOperacion(error, 'No se pudo cambiar el estado.'))
+    } finally {
+      setEstadosEnCurso((prev) => {
+        const copia = new Set(prev)
+        copia.delete(adm.id)
+        return copia
+      })
+      operandoRef.current = false
+      setTimeout(() => {
+        setAvisoExito(null)
+        setErrorCarga(null)
+      }, 4000)
+    }
   }
 
   const abrirEliminar = (adm) => {
     setAdminSeleccionadoId(adm.id)
+    setErrorEliminar(null)
     setModalEliminar(true)
   }
 
-  const confirmarEliminar = () => {
-    if (!adminSeleccionado || adminSeleccionado.esSuperAdmin) return
-    setAdmins((prev) => prev.filter((a) => a.id !== adminSeleccionado.id))
+  const cerrarEliminar = () => {
+    if (eliminando) return
     setModalEliminar(false)
-    const resto = admins.filter((a) => a.id !== adminSeleccionado.id)
-    if (resto.length > 0) {
-      setAdminSeleccionadoId(resto[0].id)
+    setErrorEliminar(null)
+  }
+
+  const confirmarEliminar = async () => {
+    if (!adminSeleccionado || eliminando) return
+    setEliminando(true)
+    setErrorEliminar(null)
+    try {
+      await eliminarUsuario(adminSeleccionado.id)
+      setModalEliminar(false)
+      setAvisoExito(`«${adminSeleccionado.nombre}» fue eliminado.`)
+      setAdminSeleccionadoId(null)
+      await cargarAdministradores()
+    } catch (error) {
+      setErrorEliminar(mensajeOperacion(error, 'No se pudo eliminar el administrador.'))
+    } finally {
+      setEliminando(false)
+      setTimeout(() => setAvisoExito(null), 4000)
     }
   }
 
@@ -520,6 +628,17 @@ export default function Administradores({ sesion: _sesion }) {
                       <td>{item.fechaCreacion}</td>
                       <td>
                         <div className="admin-acciones-wrap" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            className="btn-accion-admin"
+                            title={item.estadoBackend === 'ACTIVO' ? 'Desactivar cuenta' : 'Activar cuenta'}
+                            aria-label={`${item.estadoBackend === 'ACTIVO' ? 'Desactivar' : 'Activar'} ${item.nombre}`}
+                            aria-busy={estadosEnCurso.has(item.id)}
+                            disabled={estadosEnCurso.has(item.id)}
+                            onClick={() => cambiarEstado(item)}
+                          >
+                            {item.estadoBackend === 'ACTIVO' ? <IconoBloqueo /> : <IconoCheck />}
+                          </button>
                           <button
                             type="button"
                             className="btn-accion-admin"
@@ -754,14 +873,15 @@ export default function Administradores({ sesion: _sesion }) {
 
       {/* ===================== Modal: Editar Administrador ===================== */}
       {modalEditar && (
-        <div className="admin-modal-overlay" onClick={() => setModalEditar(false)}>
+        <div className="admin-modal-overlay" onClick={cerrarEditar}>
           <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
             <header className="admin-modal__header">
               <h3 className="admin-modal__titulo">Editar administrador</h3>
               <button
                 type="button"
                 className="admin-modal__cerrar"
-                onClick={() => setModalEditar(false)}
+                onClick={cerrarEditar}
+                disabled={guardandoEdicion}
               >
                 <IconoCruz />
               </button>
@@ -775,6 +895,7 @@ export default function Administradores({ sesion: _sesion }) {
                   required
                   value={formNombre}
                   onChange={(e) => setFormNombre(e.target.value)}
+                  disabled={guardandoEdicion}
                 />
               </div>
 
@@ -785,6 +906,7 @@ export default function Administradores({ sesion: _sesion }) {
                   required
                   value={formCorreo}
                   onChange={(e) => setFormCorreo(e.target.value)}
+                  disabled={guardandoEdicion}
                 />
               </div>
 
@@ -796,29 +918,26 @@ export default function Administradores({ sesion: _sesion }) {
                     <option value="SuperAdmin">SuperAdmin</option>
                   </select>
                 </div>
-                <div className="admin-campo">
-                  <label>Estado</label>
-                  <select
-                    value={formEstado}
-                    onChange={(e) => setFormEstado(e.target.value)}
-                    disabled={adminSeleccionado?.esSuperAdmin}
-                  >
-                    <option value="Activo">Activo</option>
-                    <option value="Inactivo">Inactivo</option>
-                  </select>
-                </div>
               </div>
+
+              {errorEditar && (
+                <div className="admin-modal__error" role="alert">
+                  <IconoAdvertencia />
+                  <span>{errorEditar}</span>
+                </div>
+              )}
 
               <footer className="admin-modal__footer">
                 <button
                   type="button"
                   className="btn-modal-cancelar"
-                  onClick={() => setModalEditar(false)}
+                  onClick={cerrarEditar}
+                  disabled={guardandoEdicion}
                 >
                   Cancelar
                 </button>
-                <button type="submit" className="btn-modal-guardar">
-                  Guardar cambios
+                <button type="submit" className="btn-modal-guardar" disabled={guardandoEdicion}>
+                  {guardandoEdicion ? 'Guardando…' : 'Guardar cambios'}
                 </button>
               </footer>
             </form>
@@ -828,14 +947,15 @@ export default function Administradores({ sesion: _sesion }) {
 
       {/* ===================== Modal: Confirmar Eliminar ===================== */}
       {modalEliminar && adminSeleccionado && (
-        <div className="admin-modal-overlay" onClick={() => setModalEliminar(false)}>
+        <div className="admin-modal-overlay" onClick={cerrarEliminar}>
           <div className="admin-modal admin-modal--eliminar" onClick={(e) => e.stopPropagation()}>
             <header className="admin-modal__header">
               <h3 className="admin-modal__titulo">Eliminar administrador</h3>
               <button
                 type="button"
                 className="admin-modal__cerrar"
-                onClick={() => setModalEliminar(false)}
+                onClick={cerrarEliminar}
+                disabled={eliminando}
               >
                 <IconoCruz />
               </button>
@@ -851,11 +971,19 @@ export default function Administradores({ sesion: _sesion }) {
               </p>
             </div>
 
+            {errorEliminar && (
+              <div className="admin-modal__error" role="alert">
+                <IconoAdvertencia />
+                <span>{errorEliminar}</span>
+              </div>
+            )}
+
             <footer className="admin-modal__footer">
               <button
                 type="button"
                 className="btn-modal-cancelar"
-                onClick={() => setModalEliminar(false)}
+                onClick={cerrarEliminar}
+                disabled={eliminando}
               >
                 Cancelar
               </button>
@@ -863,8 +991,9 @@ export default function Administradores({ sesion: _sesion }) {
                 type="button"
                 className="btn-modal-eliminar"
                 onClick={confirmarEliminar}
+                disabled={eliminando}
               >
-                Eliminar administrador
+                {eliminando ? 'Eliminando…' : 'Eliminar administrador'}
               </button>
             </footer>
           </div>

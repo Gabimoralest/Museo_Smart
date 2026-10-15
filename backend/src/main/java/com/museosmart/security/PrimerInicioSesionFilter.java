@@ -32,7 +32,8 @@ public class PrimerInicioSesionFilter extends OncePerRequestFilter {
     private static final List<String> RUTAS_PROTEGIDAS = List.of(
             "/api/v1/admin/exhibiciones",
             "/api/v1/admin/usuarios",
-            "/api/v1/admin/popularidad");
+            "/api/v1/admin/popularidad",
+            "/api/v1/admin/monitoreo");
 
     private final ObjectMapper objectMapper;
 

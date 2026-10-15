@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import {
   IconoCampana,
   IconoAdvertencia,
@@ -7,44 +7,174 @@ import {
   IconoCruz,
   IconoReloj,
 } from './iconos'
-import { alertasIniciales } from '../data/alertasData'
+import { listarAlertas, resolverAlerta } from '../data/alertasApi'
+import { ErrorHttp } from '../data/httpClient'
 import './Alertas.css'
 
+// ------------------------------------------------------------------
+// Mapeo del DTO real (AlertaResponse) al formato que ya usa la tabla
+// y el panel de detalle. El backend maneja enums en inglés:
+//   tipo      ∈ {AMBIENTAL, PRESENCIA, SISTEMA, INTEGRACION}
+//   severidad ∈ {INFO, ADVERTENCIA, CRITICA}
+//   estado    ∈ {ABIERTA, RECONOCIDA, RESUELTA, CERRADA}
+// La interfaz usa etiquetas en español. `tipo` (clase de estilo/icono)
+// se deriva de la severidad/estado; el estado de ciclo de vida se
+// conserva aparte. No se inventan campos que el backend no envía.
+// ------------------------------------------------------------------
+
+const ESTADOS_ACTIVOS = new Set(['ABIERTA', 'RECONOCIDA'])
+
+function formatearFecha(iso) {
+  if (!iso) return '—'
+  const fecha = new Date(iso)
+  if (Number.isNaN(fecha.getTime())) return '—'
+  return fecha.toLocaleString('es-CO', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  })
+}
+
+function etiquetaSeveridad(sev) {
+  if (sev === 'CRITICA') return 'Crítica'
+  if (sev === 'ADVERTENCIA') return 'Advertencia'
+  if (sev === 'INFO') return 'Info'
+  return sev || '—'
+}
+
+function etiquetaEstado(estado) {
+  if (estado === 'ABIERTA') return 'Abierta'
+  if (estado === 'RECONOCIDA') return 'Reconocida'
+  if (estado === 'RESUELTA') return 'Resuelta'
+  if (estado === 'CERRADA') return 'Cerrada'
+  return estado || '—'
+}
+
+function etiquetaTipo(tipo) {
+  if (tipo === 'AMBIENTAL') return 'Ambiental'
+  if (tipo === 'PRESENCIA') return 'Presencia'
+  if (tipo === 'SISTEMA') return 'Sistema'
+  if (tipo === 'INTEGRACION') return 'Integración'
+  return tipo || '—'
+}
+
+// Clase visual del icono/badge: resuelta si ya no está activa; si no,
+// según la severidad.
+function estiloVisual(dto) {
+  if (!ESTADOS_ACTIVOS.has(dto.estado)) return 'resuelta'
+  if (dto.severidad === 'CRITICA') return 'critica'
+  if (dto.severidad === 'ADVERTENCIA') return 'advertencia'
+  return 'advertencia'
+}
+
+function mapearAlerta(dto) {
+  return {
+    id: dto.id,
+    estilo: estiloVisual(dto),
+    fechaHora: formatearFecha(dto.iniciadaEn),
+    resueltaEnTexto: dto.resueltaEn ? formatearFecha(dto.resueltaEn) : null,
+    titulo: dto.descripcion ?? dto.condicionClave ?? 'Alerta',
+    mensaje: dto.descripcion ?? '',
+    sensor: dto.sensorCodigo ?? '—',
+    sensorCodigo: dto.sensorCodigo ?? null,
+    tipo: etiquetaTipo(dto.tipo),
+    tipoBackend: dto.tipo ?? '',
+    severidad: etiquetaSeveridad(dto.severidad),
+    severidadBackend: dto.severidad ?? '',
+    estado: etiquetaEstado(dto.estado),
+    estadoBackend: dto.estado ?? '',
+    activa: ESTADOS_ACTIVOS.has(dto.estado),
+    condicionClave: dto.condicionClave ?? '',
+    descripcion: dto.descripcion ?? '',
+  }
+}
+
+function mensajeDeError(error, porDefecto) {
+  if (error instanceof ErrorHttp) {
+    if (error.tipo === 'conexion') {
+      return 'No pudimos conectar con el servidor. Verifica tu conexión e inténtalo de nuevo.'
+    }
+    if (error.tipo === 'autorizacion') {
+      return 'Tu sesión ha expirado o no tienes permisos para ver las alertas.'
+    }
+    return error.message || porDefecto
+  }
+  return porDefecto
+}
+
 export default function Alertas() {
-  const [alertas, setAlertas] = useState(alertasIniciales)
-  const [alertaSeleccionadaId, setAlertaSeleccionadaId] = useState(1)
+  const [alertas, setAlertas] = useState([])
+  const [alertaSeleccionadaId, setAlertaSeleccionadaId] = useState(null)
   const [drawerAbierto, setDrawerAbierto] = useState(true)
+
+  // Estado de la consulta real al backend.
+  const [cargando, setCargando] = useState(true)
+  const [errorCarga, setErrorCarga] = useState(null)
+  const [aviso, setAviso] = useState(null)
+
+  // Resolución de alertas en curso.
+  const [resolviendoIds, setResolviendoIds] = useState(() => new Set())
+  const resolviendoRef = useRef(false)
 
   // Filtros
   const [filtroEstado, setFiltroEstado] = useState('Todos')
   const [filtroTipo, setFiltroTipo] = useState('Todos')
   const [filtroSensor, setFiltroSensor] = useState('Todos')
-  const [filtroFecha, setFiltroFecha] = useState('7d')
 
   // Paginación
   const [paginaActual, setPaginaActual] = useState(1)
   const elementosPorPagina = 10
 
-  // Contadores dinámicos calculados
+  // Carga del histórico real (incluye resueltas para el contador).
+  const cargarAlertas = useCallback(async (signal) => {
+    setCargando(true)
+    setErrorCarga(null)
+    try {
+      const datos = await listarAlertas({ todas: true, signal })
+      setAlertas((datos || []).map(mapearAlerta))
+    } catch (error) {
+      if (error?.name === 'AbortError') return
+      setErrorCarga(mensajeDeError(error, 'No se pudieron cargar las alertas.'))
+    } finally {
+      setCargando(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    const controlador = new AbortController()
+    cargarAlertas(controlador.signal)
+    return () => controlador.abort()
+  }, [cargarAlertas])
+
+  // Contadores dinámicos calculados a partir de los datos reales.
   const cuentaCriticas = useMemo(
-    () => alertas.filter((a) => a.estado === 'Crítica').length,
+    () => alertas.filter((a) => a.severidadBackend === 'CRITICA' && a.activa).length,
     [alertas],
   )
   const cuentaAdvertencias = useMemo(
-    () => alertas.filter((a) => a.estado === 'Advertencia').length,
+    () => alertas.filter((a) => a.severidadBackend === 'ADVERTENCIA' && a.activa).length,
     [alertas],
   )
   const cuentaResueltas = useMemo(
-    () => alertas.filter((a) => a.estado === 'Resuelta').length,
+    () => alertas.filter((a) => a.estadoBackend === 'RESUELTA').length,
     [alertas],
   )
 
-  // Filtrado de alertas
+  // Opciones de sensor derivadas de los datos reales cargados.
+  const opcionesSensor = useMemo(() => {
+    const codigos = new Set(alertas.map((a) => a.sensorCodigo).filter(Boolean))
+    return Array.from(codigos).sort()
+  }, [alertas])
+
+  // Filtrado de alertas (estado de ciclo de vida, tipo y sensor).
   const alertasFiltradas = useMemo(() => {
     return alertas.filter((item) => {
-      if (filtroEstado !== 'Todos' && item.estado !== filtroEstado) return false
-      if (filtroTipo !== 'Todos' && item.tipoAlerta !== filtroTipo) return false
-      if (filtroSensor !== 'Todos' && item.sensor !== filtroSensor) return false
+      if (filtroEstado !== 'Todos' && item.estadoBackend !== filtroEstado) return false
+      if (filtroTipo !== 'Todos' && item.tipoBackend !== filtroTipo) return false
+      if (filtroSensor !== 'Todos' && item.sensorCodigo !== filtroSensor) return false
       return true
     })
   }, [alertas, filtroEstado, filtroTipo, filtroSensor])
@@ -66,21 +196,33 @@ export default function Alertas() {
     setDrawerAbierto(true)
   }
 
-  // Acción: Marcar como resuelta
-  const marcarComoResuelta = (id) => {
-    setAlertas((lista) =>
-      lista.map((al) => {
-        if (al.id === id) {
-          return {
-            ...al,
-            estado: 'Resuelta',
-            tipo: 'resuelta',
-            resuelta: true,
-          }
-        }
-        return al
-      }),
-    )
+  // Acción: resolver alerta en el backend.
+  const marcarComoResuelta = async (id) => {
+    if (resolviendoRef.current || resolviendoIds.has(id)) return
+    resolviendoRef.current = true
+    setResolviendoIds((prev) => new Set(prev).add(id))
+    setAviso(null)
+    try {
+      const actualizada = await resolverAlerta(id)
+      // La respuesta del backend es la fuente de verdad.
+      setAlertas((lista) =>
+        lista.map((a) => (a.id === id ? { ...a, ...mapearAlerta(actualizada) } : a)),
+      )
+      setAviso({ tipo: 'exito', texto: 'La alerta se marcó como resuelta.' })
+    } catch (error) {
+      setAviso({
+        tipo: 'error',
+        texto: mensajeDeError(error, 'No se pudo resolver la alerta. Inténtalo de nuevo.'),
+      })
+    } finally {
+      setResolviendoIds((prev) => {
+        const copia = new Set(prev)
+        copia.delete(id)
+        return copia
+      })
+      resolviendoRef.current = false
+      setTimeout(() => setAviso(null), 4000)
+    }
   }
 
   return (
@@ -144,6 +286,18 @@ export default function Alertas() {
         </article>
       </section>
 
+      {/* ===================== Aviso de resultado ===================== */}
+      {aviso && (
+        <div
+          className={`alertas-aviso alertas-aviso--${aviso.tipo}`}
+          role={aviso.tipo === 'error' ? 'alert' : 'status'}
+          aria-live="polite"
+        >
+          {aviso.tipo === 'error' ? <IconoAdvertencia /> : <IconoCheck />}
+          <span>{aviso.texto}</span>
+        </div>
+      )}
+
       {/* ===================== Barra de Filtros ===================== */}
       <section className="alertas-filtros-bar">
         <label className="alertas-filtro-item">
@@ -152,9 +306,10 @@ export default function Alertas() {
           </span>
           <select value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)}>
             <option value="Todos">Todos</option>
-            <option value="Crítica">Crítica</option>
-            <option value="Advertencia">Advertencia</option>
-            <option value="Resuelta">Resuelta</option>
+            <option value="ABIERTA">Abierta</option>
+            <option value="RECONOCIDA">Reconocida</option>
+            <option value="RESUELTA">Resuelta</option>
+            <option value="CERRADA">Cerrada</option>
           </select>
         </label>
 
@@ -164,9 +319,10 @@ export default function Alertas() {
           </span>
           <select value={filtroTipo} onChange={(e) => setFiltroTipo(e.target.value)}>
             <option value="Todos">Todos</option>
-            <option value="Humedad elevada">Humedad elevada</option>
-            <option value="Temperatura fuera de rango">Temperatura fuera de rango</option>
-            <option value="Restablecimiento">Restablecimiento</option>
+            <option value="AMBIENTAL">Ambiental</option>
+            <option value="PRESENCIA">Presencia</option>
+            <option value="SISTEMA">Sistema</option>
+            <option value="INTEGRACION">Integración</option>
           </select>
         </label>
 
@@ -176,21 +332,11 @@ export default function Alertas() {
           </span>
           <select value={filtroSensor} onChange={(e) => setFiltroSensor(e.target.value)}>
             <option value="Todos">Todos</option>
-            <option value="DHT22-01">DHT22-01</option>
-            <option value="DHT22-02">DHT22-02</option>
-            <option value="DHT22-03">DHT22-03</option>
-            <option value="DHT22-04">DHT22-04</option>
-          </select>
-        </label>
-
-        <label className="alertas-filtro-item">
-          <span className="alertas-filtro-label">
-            <IconoReloj /> Rango de fechas
-          </span>
-          <select value={filtroFecha} onChange={(e) => setFiltroFecha(e.target.value)}>
-            <option value="24h">Últimas 24 horas</option>
-            <option value="7d">Últimos 7 días</option>
-            <option value="30d">Últimos 30 días</option>
+            {opcionesSensor.map((codigo) => (
+              <option key={codigo} value={codigo}>
+                {codigo}
+              </option>
+            ))}
           </select>
         </label>
       </section>
@@ -206,15 +352,44 @@ export default function Alertas() {
             <h2 className="alertas-tabla-titulo">Historial de alertas</h2>
           </header>
 
+          {cargando && (
+            <div className="alertas-estado" role="status" aria-live="polite">
+              <p className="alertas-estado__texto">Cargando alertas…</p>
+            </div>
+          )}
+
+          {!cargando && errorCarga && (
+            <div className="alertas-estado alertas-estado--error" role="alert">
+              <span className="alertas-estado__icono" aria-hidden="true">
+                <IconoAdvertencia />
+              </span>
+              <p className="alertas-estado__texto">{errorCarga}</p>
+              <button type="button" className="alertas-estado__boton" onClick={() => cargarAlertas()}>
+                Reintentar
+              </button>
+            </div>
+          )}
+
+          {!cargando && !errorCarga && alertasFiltradas.length === 0 && (
+            <div className="alertas-estado" role="status">
+              <p className="alertas-estado__texto">
+                {alertas.length === 0
+                  ? 'No hay alertas registradas.'
+                  : 'Ninguna alerta coincide con los filtros aplicados.'}
+              </p>
+            </div>
+          )}
+
+          {!cargando && !errorCarga && alertasFiltradas.length > 0 && (
           <div className="alertas-tabla-contenedor">
             <table className="alertas-tabla">
               <thead>
                 <tr>
                   <th>Fecha y hora</th>
-                  <th>Tipo</th>
+                  <th>Severidad</th>
                   <th>Mensaje</th>
                   <th>Sensor</th>
-                  <th>Ubicación</th>
+                  <th>Tipo</th>
                   <th>Estado</th>
                   <th>Acciones</th>
                 </tr>
@@ -230,17 +405,17 @@ export default function Alertas() {
                     >
                       <td>{item.fechaHora}</td>
                       <td>
-                        <span className={`alerta-tipo-icono alerta-tipo-icono--${item.tipo}`}>
-                          {item.tipo === 'critica' && '!'}
-                          {item.tipo === 'advertencia' && <IconoAdvertencia />}
-                          {item.tipo === 'resuelta' && <IconoCheck />}
+                        <span className={`alerta-tipo-icono alerta-tipo-icono--${item.estilo}`}>
+                          {item.estilo === 'critica' && '!'}
+                          {item.estilo === 'advertencia' && <IconoAdvertencia />}
+                          {item.estilo === 'resuelta' && <IconoCheck />}
                         </span>
                       </td>
                       <td className="col-mensaje">{item.mensaje}</td>
                       <td><code>{item.sensor}</code></td>
-                      <td>{item.ubicacion}</td>
+                      <td>{item.tipo}</td>
                       <td>
-                        <span className={`alerta-estado-badge alerta-estado-badge--${item.tipo}`}>
+                        <span className={`alerta-estado-badge alerta-estado-badge--${item.estilo}`}>
                           ● {item.estado}
                         </span>
                       </td>
@@ -263,7 +438,9 @@ export default function Alertas() {
               </tbody>
             </table>
           </div>
+          )}
 
+          {!cargando && !errorCarga && alertasFiltradas.length > 0 && (
           <footer className="alertas-paginacion">
             <span className="alertas-paginacion__conteo">
               Mostrando {indiceInicio + 1} -{' '}
@@ -304,6 +481,7 @@ export default function Alertas() {
               <span>Mostrar 10 por página</span>
             </div>
           </footer>
+          )}
         </article>
 
         {/* Panel lateral: Detalle de Alerta */}
@@ -325,15 +503,15 @@ export default function Alertas() {
             </header>
 
             <div className="alerta-detalle__hero">
-              <div className={`alerta-detalle__badge-icono alerta-detalle__badge-icono--${alertaActual.tipo}`}>
-                {alertaActual.tipo === 'critica' && '!'}
-                {alertaActual.tipo === 'advertencia' && <IconoAdvertencia />}
-                {alertaActual.tipo === 'resuelta' && <IconoCheck />}
+              <div className={`alerta-detalle__badge-icono alerta-detalle__badge-icono--${alertaActual.estilo}`}>
+                {alertaActual.estilo === 'critica' && '!'}
+                {alertaActual.estilo === 'advertencia' && <IconoAdvertencia />}
+                {alertaActual.estilo === 'resuelta' && <IconoCheck />}
               </div>
               <div className="alerta-detalle__hero-textos">
                 <div className="alerta-detalle__hero-fila">
                   <h4 className="alerta-detalle__hero-titulo">{alertaActual.titulo}</h4>
-                  <span className={`alerta-badge-pill alerta-badge-pill--${alertaActual.tipo}`}>
+                  <span className={`alerta-badge-pill alerta-badge-pill--${alertaActual.estilo}`}>
                     {alertaActual.estado}
                   </span>
                 </div>
@@ -347,24 +525,26 @@ export default function Alertas() {
                 <span className="alerta-meta-valor"><code>{alertaActual.sensor}</code></span>
               </div>
               <div className="alerta-meta-fila">
-                <span className="alerta-meta-label">Ubicación</span>
-                <span className="alerta-meta-valor">{alertaActual.ubicacion}</span>
+                <span className="alerta-meta-label">Tipo</span>
+                <span className="alerta-meta-valor">{alertaActual.tipo}</span>
               </div>
               <div className="alerta-meta-fila">
-                <span className="alerta-meta-label">Tipo de alerta</span>
-                <span className="alerta-meta-valor">{alertaActual.tipoAlerta}</span>
+                <span className="alerta-meta-label">Severidad</span>
+                <span className="alerta-meta-valor">{alertaActual.severidad}</span>
               </div>
               <div className="alerta-meta-fila">
-                <span className="alerta-meta-label">Valor registrado</span>
-                <span className="alerta-meta-valor">{alertaActual.valorRegistrado}</span>
+                <span className="alerta-meta-label">Condición</span>
+                <span className="alerta-meta-valor">{alertaActual.condicionClave}</span>
               </div>
-              <div className="alerta-meta-fila">
-                <span className="alerta-meta-label">Umbral configurado</span>
-                <span className="alerta-meta-valor">{alertaActual.umbralConfigurado}</span>
-              </div>
+              {alertaActual.resueltaEnTexto && (
+                <div className="alerta-meta-fila">
+                  <span className="alerta-meta-label">Resuelta en</span>
+                  <span className="alerta-meta-valor">{alertaActual.resueltaEnTexto}</span>
+                </div>
+              )}
               <div className="alerta-meta-fila">
                 <span className="alerta-meta-label">Estado</span>
-                <span className={`alerta-meta-valor alerta-meta-valor--${alertaActual.tipo}`}>
+                <span className={`alerta-meta-valor alerta-meta-valor--${alertaActual.estilo}`}>
                   ● {alertaActual.estado}
                 </span>
               </div>
@@ -375,24 +555,16 @@ export default function Alertas() {
               <p className="alerta-detalle__descripcion">{alertaActual.descripcion}</p>
             </div>
 
-            <div className="alerta-detalle__seccion">
-              <h5 className="alerta-detalle__seccion-titulo">Acciones recomendadas</h5>
-              <ul className="alerta-detalle__acciones-lista">
-                {alertaActual.accionesRecomendadas?.map((acc, idx) => (
-                  <li key={idx}>{acc}</li>
-                ))}
-              </ul>
-            </div>
-
             <div className="alerta-detalle__footer">
-              {alertaActual.estado !== 'Resuelta' ? (
+              {alertaActual.activa ? (
                 <button
                   type="button"
                   className="alerta-btn-resolver"
+                  disabled={resolviendoIds.has(alertaActual.id)}
                   onClick={() => marcarComoResuelta(alertaActual.id)}
                 >
                   <IconoCheck />
-                  <span>Marcar como resuelta</span>
+                  <span>{resolviendoIds.has(alertaActual.id) ? 'Resolviendo…' : 'Marcar como resuelta'}</span>
                 </button>
               ) : (
                 <div className="alerta-resuelta-aviso">

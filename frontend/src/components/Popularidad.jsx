@@ -1,38 +1,131 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import {
   IconoAnalitica,
-  IconoTemplo,
-  IconoReloj,
   IconoCheck,
-  IconoChevron,
   IconoCorona,
+  IconoAdvertencia,
+  IconoBuscar,
 } from './iconos'
-import {
-  metricasPopularidad,
-  distribucionSalas,
-  rankingExhibiciones,
-} from '../data/popularidadData'
+import { obtenerRanking } from '../data/popularidadApi'
+import { ErrorHttp } from '../data/httpClient'
+import { imagenExhibicion } from '../data/exhibicionesData'
 import './Popularidad.css'
 
+// ------------------------------------------------------------------
+// El backend solo expone el ranking de popularidad:
+//   { posicion, exhibicionId, codigo, titulo, salaId, salaNombre,
+//     totalVisitasValidas }
+// ordenado por visitas válidas desc y título asc (empates comparten
+// posición). Los indicadores sin respaldo en el backend (tendencia
+// temporal, tiempo promedio, satisfacción, calificación, distribución
+// por sala) se calculan SOLO a partir del ranking real o se eliminan.
+// No se usan datos ficticios.
+// ------------------------------------------------------------------
+
+// La imagen no viene del backend; se reutiliza el recurso local de forma
+// estable por id, igual que en Gestión de exhibiciones.
+const IMAGENES_DISPONIBLES = [
+  '01-mascara-ceremonial.jpg',
+  '02-fosil-ammonite.jpg',
+  '03-vasija-ceramica.jpg',
+  '04-retrato-historico.jpg',
+  '05-textil-ancestral.jpg',
+  '06-orfebreria-muisca.jpg',
+  '07-escultura-litica.jpg',
+  '08-restos-oseos.jpg',
+]
+
+function imagenPara(exhibicionId) {
+  const id = Number(exhibicionId)
+  const indice = Number.isFinite(id) && id > 0 ? (id - 1) % IMAGENES_DISPONIBLES.length : 0
+  return imagenExhibicion(IMAGENES_DISPONIBLES[indice])
+}
+
+function mensajeDeError(error, porDefecto) {
+  if (error instanceof ErrorHttp) {
+    if (error.tipo === 'conexion') {
+      return 'No pudimos conectar con el servidor. Verifica tu conexión e inténtalo de nuevo.'
+    }
+    if (error.tipo === 'autorizacion') {
+      return 'Tu sesión ha expirado o no tienes permisos para ver la popularidad.'
+    }
+    return error.message || porDefecto
+  }
+  return porDefecto
+}
+
 export default function Popularidad() {
-  const [periodo, setPeriodo] = useState('24h')
+  const [ranking, setRanking] = useState([])
+  const [cargando, setCargando] = useState(true)
+  const [errorCarga, setErrorCarga] = useState(null)
+
   const [filtroSala, setFiltroSala] = useState('Todas')
   const [filtroOrden, setFiltroOrden] = useState('visitas')
 
-  // Filtrado y ordenamiento de exhibiciones
-  const listaFiltrada = useMemo(() => {
-    let res = rankingExhibiciones.filter((item) => {
-      if (filtroSala !== 'Todas' && !item.sala.includes(filtroSala)) return false
-      return true
-    })
+  const cargarRanking = useCallback(async (signal) => {
+    setCargando(true)
+    setErrorCarga(null)
+    try {
+      const datos = await obtenerRanking({ signal })
+      setRanking((datos || []).map((dto) => ({ ...dto, imagen: imagenPara(dto.exhibicionId) })))
+    } catch (error) {
+      if (error?.name === 'AbortError') return
+      setErrorCarga(mensajeDeError(error, 'No se pudo cargar el ranking de popularidad.'))
+    } finally {
+      setCargando(false)
+    }
+  }, [])
 
-    if (filtroOrden === 'visitas') {
-      res = [...res].sort((a, b) => b.visitas - a.visitas)
-    } else if (filtroOrden === 'nombre') {
-      res = [...res].sort((a, b) => a.nombre.localeCompare(b.nombre))
+  useEffect(() => {
+    const controlador = new AbortController()
+    cargarRanking(controlador.signal)
+    return () => controlador.abort()
+  }, [cargarRanking])
+
+  // Métricas derivadas del ranking real.
+  const visitasTotales = useMemo(
+    () => ranking.reduce((acc, r) => acc + (r.totalVisitasValidas || 0), 0),
+    [ranking],
+  )
+  const masVisitada = useMemo(() => ranking[0] || null, [ranking])
+  const maxVisitas = masVisitada?.totalVisitasValidas || 0
+
+  // Salas presentes en el ranking, para el filtro.
+  const opcionesSala = useMemo(() => {
+    const mapa = new Map()
+    ranking.forEach((r) => {
+      if (r.salaId != null && !mapa.has(r.salaId)) mapa.set(r.salaId, r.salaNombre)
+    })
+    return Array.from(mapa, ([id, nombre]) => ({ id, nombre }))
+  }, [ranking])
+
+  // Distribución de visitas por sala, calculada con los datos reales.
+  const distribucionSalas = useMemo(() => {
+    const acumulado = new Map()
+    ranking.forEach((r) => {
+      if (r.salaId == null) return
+      const actual = acumulado.get(r.salaId) || { salaId: r.salaId, nombre: r.salaNombre, visitas: 0 }
+      actual.visitas += r.totalVisitasValidas || 0
+      acumulado.set(r.salaId, actual)
+    })
+    const total = Array.from(acumulado.values()).reduce((a, s) => a + s.visitas, 0)
+    return Array.from(acumulado.values())
+      .map((s) => ({ ...s, porcentaje: total > 0 ? Math.round((s.visitas / total) * 100) : 0 }))
+      .sort((a, b) => b.visitas - a.visitas)
+  }, [ranking])
+
+  const COLORES_SALA = ['#d4af37', '#e5a842', '#2a9d8f', '#e76f51', '#8d5b94', '#457b9d']
+
+  // El backend ya entrega el ranking ordenado (visitas desc, título asc).
+  // El filtro de sala solo recorta; el "orden por nombre" es la única
+  // reordenación permitida en cliente (A-Z) y recalcula la posición mostrada.
+  const listaFiltrada = useMemo(() => {
+    let res = ranking.filter((item) => filtroSala === 'Todas' || String(item.salaId) === filtroSala)
+    if (filtroOrden === 'nombre') {
+      res = [...res].sort((a, b) => (a.titulo || '').localeCompare(b.titulo || '', 'es'))
     }
     return res
-  }, [filtroSala, filtroOrden])
+  }, [ranking, filtroSala, filtroOrden])
 
   return (
     <div className="popularidad-vista">
@@ -41,253 +134,106 @@ export default function Popularidad() {
         <div className="popularidad-cabecera__textos">
           <h1 className="popularidad-cabecera__titulo">Popularidad</h1>
           <p className="popularidad-cabecera__subtitulo">
-            Visualiza el interés, afluencia y ranking de visitas de las exhibiciones del museo.
+            Ranking de exhibiciones por interacciones válidas registradas.
           </p>
-        </div>
-
-        <div className="popularidad-cabecera__filtro">
-          <button
-            type="button"
-            className="popularidad-filtro-btn"
-            onClick={() => setPeriodo((p) => (p === '24h' ? '7d' : p === '7d' ? '30d' : '24h'))}
-          >
-            <IconoReloj />
-            <span>
-              {periodo === '24h'
-                ? 'Últimas 24 horas'
-                : periodo === '7d'
-                  ? 'Últimos 7 días'
-                  : 'Últimos 30 días'}
-            </span>
-            <IconoChevron />
-          </button>
         </div>
       </header>
 
-      {/* ===================== 4 Tarjetas de Métricas ===================== */}
+      {/* ===================== Aviso de error / carga ===================== */}
+      {!cargando && errorCarga && (
+        <div className="popularidad-aviso popularidad-aviso--error" role="alert">
+          <IconoAdvertencia />
+          <span>{errorCarga}</span>
+          <button type="button" className="popularidad-aviso__boton" onClick={() => cargarRanking()}>
+            Reintentar
+          </button>
+        </div>
+      )}
+
+      {/* ===================== 3 Tarjetas de Métricas (datos reales) ===================== */}
+      {!cargando && !errorCarga && (
       <section className="popularidad-stats" aria-label="Indicadores de popularidad">
-        {/* Card 1: Visitas Totales */}
+        {/* Card 1: Interacciones totales */}
         <article className="pop-stat-card">
           <div className="pop-stat__icono pop-stat__icono--visitas">
             <IconoAnalitica />
           </div>
           <div className="pop-stat__cuerpo">
-            <span className="pop-stat__valor">{metricasPopularidad.visitasTotales}</span>
-            <span className="pop-stat__etiqueta">Visitas totales</span>
-            <span className="pop-stat__subnota texto-verde">
-              {metricasPopularidad.variacionVisitas}
-            </span>
+            <span className="pop-stat__valor">{visitasTotales.toLocaleString('es-CO')}</span>
+            <span className="pop-stat__etiqueta">Interacciones válidas</span>
+            <span className="pop-stat__subnota">Suma del ranking actual</span>
           </div>
-          <svg className="pop-stat__sparkline" viewBox="0 0 100 40" preserveAspectRatio="none">
-            <path d="M0,32 Q25,35 45,22 T80,24 T100,10 L100,40 L0,40 Z" fill="rgba(198, 161, 91, 0.15)" />
-            <path d="M0,32 Q25,35 45,22 T80,24 T100,10" fill="none" stroke="#c6a15b" strokeWidth="2" />
-          </svg>
         </article>
 
-        {/* Card 2: Más Visitada */}
+        {/* Card 2: Más visitada */}
         <article className="pop-stat-card">
           <div className="pop-stat__icono pop-stat__icono--corona">
             <IconoCorona />
           </div>
           <div className="pop-stat__cuerpo">
             <span className="pop-stat__valor pop-stat__valor--texto">
-              {metricasPopularidad.exhibicionMasVista}
+              {masVisitada?.titulo || '—'}
             </span>
-            <span className="pop-stat__etiqueta">Exhibición más vista</span>
-            <span className="pop-stat__subnota">{metricasPopularidad.salaMasVista}</span>
+            <span className="pop-stat__etiqueta">Exhibición más popular</span>
+            <span className="pop-stat__subnota">
+              {masVisitada?.salaNombre || '—'}
+              {masVisitada ? ` · ${masVisitada.totalVisitasValidas.toLocaleString('es-CO')} visitas` : ''}
+            </span>
           </div>
-          <svg className="pop-stat__sparkline" viewBox="0 0 100 40" preserveAspectRatio="none">
-            <path d="M0,35 Q30,15 50,28 T85,18 T100,8 L100,40 L0,40 Z" fill="rgba(231, 111, 81, 0.15)" />
-            <path d="M0,35 Q30,15 50,28 T85,18 T100,8" fill="none" stroke="#e76f51" strokeWidth="2" />
-          </svg>
         </article>
 
-        {/* Card 3: Tiempo promedio */}
-        <article className="pop-stat-card">
-          <div className="pop-stat__icono pop-stat__icono--tiempo">
-            <IconoReloj />
-          </div>
-          <div className="pop-stat__cuerpo">
-            <span className="pop-stat__valor">{metricasPopularidad.tiempoPromedio}</span>
-            <span className="pop-stat__etiqueta">Tiempo promedio</span>
-            <span className="pop-stat__subnota">{metricasPopularidad.tiempoDetalle}</span>
-          </div>
-          <svg className="pop-stat__sparkline" viewBox="0 0 100 40" preserveAspectRatio="none">
-            <path d="M0,28 Q20,38 45,25 T75,18 T100,14 L100,40 L0,40 Z" fill="rgba(69, 123, 157, 0.15)" />
-            <path d="M0,28 Q20,38 45,25 T75,18 T100,14" fill="none" stroke="#457b9d" strokeWidth="2" />
-          </svg>
-        </article>
-
-        {/* Card 4: Satisfacción */}
+        {/* Card 3: Exhibiciones en el ranking */}
         <article className="pop-stat-card">
           <div className="pop-stat__icono pop-stat__icono--check">
             <IconoCheck />
           </div>
           <div className="pop-stat__cuerpo">
-            <span className="pop-stat__valor">{metricasPopularidad.tasaSatisfaccion}</span>
-            <span className="pop-stat__etiqueta">Tasa de satisfacción</span>
-            <span className="pop-stat__subnota">{metricasPopularidad.satisfaccionDetalle}</span>
+            <span className="pop-stat__valor">{ranking.length}</span>
+            <span className="pop-stat__etiqueta">Exhibiciones en el ranking</span>
+            <span className="pop-stat__subnota">{opcionesSala.length} salas representadas</span>
           </div>
-          <svg className="pop-stat__sparkline" viewBox="0 0 100 40" preserveAspectRatio="none">
-            <path d="M0,35 Q20,38 35,28 T70,18 T100,8 L100,40 L0,40 Z" fill="rgba(42, 157, 143, 0.15)" />
-            <path d="M0,35 Q20,38 35,28 T70,18 T100,8" fill="none" stroke="#2a9d8f" strokeWidth="2" />
-          </svg>
         </article>
       </section>
+      )}
 
-      {/* ===================== Gráficas (2 Columnas) ===================== */}
+      {/* ===================== Distribución de visitas por sala (dato real) ===================== */}
+      {!cargando && !errorCarga && distribucionSalas.length > 0 && (
       <section className="popularidad-graficas-grid">
-        {/* Gráfica 1: Curva de Tendencia de Visitas */}
-        <article className="popularidad-grafica-card">
+        <article className="popularidad-grafica-card popularidad-grafica-card--full">
           <header className="popularidad-grafica__header">
             <div className="popularidad-grafica__titulo-wrap">
               <span className="popularidad-grafica__icono">
                 <IconoAnalitica />
               </span>
               <div>
-                <h2 className="popularidad-grafica__titulo">Tendencia de visitas</h2>
-                <span className="popularidad-grafica__subtitulo">
-                  {periodo === '24h'
-                    ? 'Horas del día (flujo de visitantes)'
-                    : 'Días del periodo seleccionado'}
+                <h2 className="popularidad-grafica__titulo">Distribución de visitas por sala</h2>
+                <span className="popularidad-grafica__subtitulo">Porcentaje sobre el total del ranking</span>
+              </div>
+            </div>
+          </header>
+
+          <div className="pop-leyenda-lista pop-leyenda-lista--barras">
+            {distribucionSalas.map((s, idx) => (
+              <div key={s.salaId} className="pop-dist-fila">
+                <span className="pop-dist__nombre">{s.nombre}</span>
+                <div className="pop-dist__barra-fondo">
+                  <div
+                    className="pop-dist__barra-progreso"
+                    style={{
+                      width: `${s.porcentaje}%`,
+                      backgroundColor: COLORES_SALA[idx % COLORES_SALA.length],
+                    }}
+                  />
+                </div>
+                <span className="pop-dist__valor">
+                  {s.visitas.toLocaleString('es-CO')} ({s.porcentaje}%)
                 </span>
               </div>
-            </div>
-          </header>
-
-          <div className="pop-svg-wrap">
-            <div className="pop-y-eje">
-              <span>1.000</span>
-              <span>750</span>
-              <span>500</span>
-              <span>250</span>
-              <span>0</span>
-            </div>
-
-            <div className="pop-chart-area">
-              <svg viewBox="0 0 600 180" preserveAspectRatio="none" className="grafica-svg">
-                <defs>
-                  <linearGradient id="grad-visitas" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#c6a15b" stopOpacity="0.45" />
-                    <stop offset="100%" stopColor="#c6a15b" stopOpacity="0.02" />
-                  </linearGradient>
-                </defs>
-
-                {/* Área bajo la curva */}
-                <path
-                  d="M0,150 C60,140 100,110 160,80 C220,50 280,70 340,35 C400,20 460,65 520,100 C560,120 580,130 600,140 L600,180 L0,180 Z"
-                  fill="url(#grad-visitas)"
-                />
-
-                {/* Línea dorada */}
-                <path
-                  d="M0,150 C60,140 100,110 160,80 C220,50 280,70 340,35 C400,20 460,65 520,100 C560,120 580,130 600,140"
-                  fill="none"
-                  stroke="#c6a15b"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                />
-              </svg>
-
-              <div className="pop-x-eje">
-                <span>08:00</span>
-                <span>10:00</span>
-                <span>12:00</span>
-                <span>14:00</span>
-                <span>16:00</span>
-                <span>18:00</span>
-                <span>20:00</span>
-              </div>
-            </div>
-          </div>
-          <span className="pop-eje-label-y">Visitas</span>
-        </article>
-
-        {/* Gráfica 2: Distribución de interés por sala (Donut) */}
-        <article className="popularidad-grafica-card">
-          <header className="popularidad-grafica__header">
-            <div className="popularidad-grafica__titulo-wrap">
-              <span className="popularidad-grafica__icono">
-                <IconoTemplo />
-              </span>
-              <div>
-                <h2 className="popularidad-grafica__titulo">Distribución de visitas por sala</h2>
-                <span className="popularidad-grafica__subtitulo">Porcentaje sobre el total</span>
-              </div>
-            </div>
-          </header>
-
-          <div className="pop-donut-wrap">
-            <div className="pop-donut-svg-wrap">
-              <svg viewBox="0 0 160 160" className="donut-svg" aria-label="Visitas por sala">
-                <circle cx="80" cy="80" r="58" fill="none" stroke="#f1ece1" strokeWidth="22" />
-                {/* Sala 1 (22% = 80.1) */}
-                <circle
-                  cx="80"
-                  cy="80"
-                  r="58"
-                  fill="none"
-                  stroke="#d4af37"
-                  strokeWidth="22"
-                  strokeDasharray="80.1 364"
-                  strokeDashoffset="91"
-                />
-                {/* Sala 2 (20% = 72.8) */}
-                <circle
-                  cx="80"
-                  cy="80"
-                  r="58"
-                  fill="none"
-                  stroke="#e5a842"
-                  strokeWidth="22"
-                  strokeDasharray="72.8 364"
-                  strokeDashoffset="10.9"
-                />
-                {/* Sala 3 (35% = 127.4) */}
-                <circle
-                  cx="80"
-                  cy="80"
-                  r="58"
-                  fill="none"
-                  stroke="#2a9d8f"
-                  strokeWidth="22"
-                  strokeDasharray="127.4 364"
-                  strokeDashoffset="-61.9"
-                />
-                {/* Sala 4 (23% = 83.7) */}
-                <circle
-                  cx="80"
-                  cy="80"
-                  r="58"
-                  fill="none"
-                  stroke="#e76f51"
-                  strokeWidth="22"
-                  strokeDasharray="83.7 364"
-                  strokeDashoffset="-189.3"
-                />
-              </svg>
-              <div className="donut-centro">
-                <span className="donut-centro__valor">{metricasPopularidad.visitasTotales}</span>
-                <span className="donut-centro__etiqueta">Visitas</span>
-              </div>
-            </div>
-
-            <div className="pop-leyenda-lista">
-              {distribucionSalas.map((s) => (
-                <div key={s.sala} className="pop-leyenda-item">
-                  <span className="pop-leyenda__punto" style={{ backgroundColor: s.color }} />
-                  <div className="pop-leyenda__info">
-                    <span className="pop-leyenda__nombre">{s.sala}</span>
-                    <span className="pop-leyenda__conteo">
-                      {s.visitas} ({s.porcentaje}%)
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
+            ))}
           </div>
         </article>
       </section>
+      )}
 
       {/* ===================== Ranking Completo de Exhibiciones ===================== */}
       <section className="popularidad-ranking-card">
@@ -306,10 +252,11 @@ export default function Popularidad() {
               <span>Sala:</span>
               <select value={filtroSala} onChange={(e) => setFiltroSala(e.target.value)}>
                 <option value="Todas">Todas las salas</option>
-                <option value="Sala 1">Sala 1</option>
-                <option value="Sala 2">Sala 2</option>
-                <option value="Sala 3">Sala 3</option>
-                <option value="Sala 4">Sala 4</option>
+                {opcionesSala.map((s) => (
+                  <option key={s.id} value={String(s.id)}>
+                    {s.nombre}
+                  </option>
+                ))}
               </select>
             </label>
 
@@ -323,42 +270,66 @@ export default function Popularidad() {
           </div>
         </header>
 
+        {cargando && (
+          <div className="popularidad-estado" role="status" aria-live="polite">
+            <p className="popularidad-estado__texto">Cargando ranking…</p>
+          </div>
+        )}
+
+        {!cargando && !errorCarga && listaFiltrada.length === 0 && (
+          <div className="popularidad-estado" role="status">
+            <span className="popularidad-estado__icono" aria-hidden="true">
+              <IconoBuscar />
+            </span>
+            <p className="popularidad-estado__texto">
+              {ranking.length === 0
+                ? 'Todavía no hay interacciones registradas.'
+                : 'Ninguna exhibición coincide con el filtro de sala.'}
+            </p>
+          </div>
+        )}
+
+        {!cargando && !errorCarga && listaFiltrada.length > 0 && (
         <div className="pop-ranking-lista">
-          {listaFiltrada.map((item, index) => (
-            <article key={item.id} className="pop-ranking-fila">
-              <span className="pop-ranking-puesto">#{index + 1}</span>
-              <img src={item.imagen} alt={item.nombre} className="pop-ranking-thumb" />
+          {listaFiltrada.map((item, index) => {
+            const porcentaje = maxVisitas > 0
+              ? Math.round((item.totalVisitasValidas / maxVisitas) * 100)
+              : 0
+            // Si se reordena por nombre, mostramos la posición secuencial;
+            // si no, la posición oficial del backend (empates la comparten).
+            const posicion = filtroOrden === 'nombre'
+              ? index + 1
+              : (filtroSala === 'Todas' ? item.posicion : index + 1)
+            return (
+              <article key={item.exhibicionId} className="pop-ranking-fila">
+                <span className="pop-ranking-puesto">#{posicion}</span>
+                <img src={item.imagen} alt={item.titulo} className="pop-ranking-thumb" />
 
-              <div className="pop-ranking-info">
-                <h3 className="pop-ranking-nombre">{item.nombre}</h3>
-                <span className="pop-ranking-sala">{item.sala}</span>
-              </div>
-
-              <div className="pop-ranking-barra-wrap">
-                <div className="pop-ranking-barra-fondo">
-                  <div
-                    className="pop-ranking-barra-progreso"
-                    style={{ width: `${item.porcentaje}%` }}
-                  />
+                <div className="pop-ranking-info">
+                  <h3 className="pop-ranking-nombre">{item.titulo}</h3>
+                  <span className="pop-ranking-sala">{item.salaNombre}</span>
                 </div>
-              </div>
 
-              <div className="pop-ranking-numeros">
-                <span className="pop-ranking-visitas">{item.visitas.toLocaleString('es-CO')}</span>
-                <span className="pop-ranking-label">visitas</span>
-              </div>
+                <div className="pop-ranking-barra-wrap">
+                  <div className="pop-ranking-barra-fondo">
+                    <div
+                      className="pop-ranking-barra-progreso"
+                      style={{ width: `${porcentaje}%` }}
+                    />
+                  </div>
+                </div>
 
-              <div className="pop-ranking-tendencia">
-                <span
-                  className={`tendencia-pill ${item.tendencia >= 0 ? 'tendencia-pill--sube' : 'tendencia-pill--baja'}`}
-                >
-                  {item.tendencia >= 0 ? `+${item.tendencia} %` : `${item.tendencia} %`}
-                </span>
-                <span className="pop-ranking-calif">{item.calificacion}</span>
-              </div>
-            </article>
-          ))}
+                <div className="pop-ranking-numeros">
+                  <span className="pop-ranking-visitas">
+                    {item.totalVisitasValidas.toLocaleString('es-CO')}
+                  </span>
+                  <span className="pop-ranking-label">visitas</span>
+                </div>
+              </article>
+            )
+          })}
         </div>
+        )}
       </section>
     </div>
   )

@@ -9,6 +9,12 @@ import java.util.Optional;
 
 public interface ExhibicionRepository extends JpaRepository<Exhibicion, Long> {
 
+    /**
+     * findById de JpaRepository se redefine para traer la sala de forma anticipada
+     * (evita LazyInitializationException al mapear a DTO fuera de la transaccion,
+     * ya que open-in-view esta deshabilitado).
+     */
+    @Override
     @EntityGraph(attributePaths = "sala")
     Optional<Exhibicion> findById(Long id);
 
@@ -17,4 +23,12 @@ public interface ExhibicionRepository extends JpaRepository<Exhibicion, Long> {
 
     @EntityGraph(attributePaths = "sala")
     List<Exhibicion> findBySalaIdAndActiva(Long salaId, boolean activa);
+
+    /**
+     * findAll de JpaRepository se redefine para traer la sala de forma anticipada.
+     * Lo usa el listado administrativo (incluye exhibiciones inactivas).
+     */
+    @Override
+    @EntityGraph(attributePaths = "sala")
+    List<Exhibicion> findAll();
 }

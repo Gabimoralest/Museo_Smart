@@ -738,6 +738,76 @@
 
 /* ===================== Responsive ===================== */
 
+/* ===================== Estados (carga/error/vacío) y aviso ===================== */
+
+.inicio-estado {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+}
+
+.inicio-estado__texto {
+  font-size: 14.5px;
+  color: #716a5f;
+}
+
+.inicio-aviso {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.inicio-aviso svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.inicio-aviso--error {
+  background: #fbeceb;
+  color: #8a1f1f;
+  border: 1px solid rgba(201, 42, 42, 0.35);
+}
+
+.inicio-aviso__boton {
+  margin-left: auto;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: #21190f;
+  color: #f7f2e9;
+  border: none;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.inicio-aviso__boton:hover {
+  background: #36291a;
+}
+
+.inicio-vacio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+  padding: 32px 16px;
+  color: #716a5f;
+  font-size: 13.5px;
+}
+
+.inicio-vacio svg {
+  width: 26px;
+  height: 26px;
+  color: #b88e38;
+}
+
 @media (max-width: 1150px) {
   .inicio-stats {
     grid-template-columns: repeat(2, 1fr);

@@ -491,6 +491,14 @@
   display: inline-block;
 }
 
+.punto-gris {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #b3ab9c;
+  display: inline-block;
+}
+
 .sala-card__lecturas-lista {
   display: flex;
   flex-direction: column;
@@ -751,4 +759,248 @@
   .monitoreo-salas-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* ===================== Estados (carga/error/vacío) y aviso ===================== */
+
+.monitoreo-estado {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+}
+
+.monitoreo-estado__texto {
+  font-size: 14.5px;
+  color: #716a5f;
+}
+
+.monitoreo-aviso {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.monitoreo-aviso svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.monitoreo-aviso--error {
+  background: #fbeceb;
+  color: #8a1f1f;
+  border: 1px solid rgba(201, 42, 42, 0.35);
+}
+
+.monitoreo-aviso__boton {
+  margin-left: auto;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: #21190f;
+  color: #f7f2e9;
+  border: none;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.monitoreo-aviso__boton:hover {
+  background: #36291a;
+}
+
+.monitoreo-vacio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+  padding: 32px 16px;
+  color: #716a5f;
+  font-size: 13.5px;
+}
+
+.monitoreo-vacio svg {
+  width: 26px;
+  height: 26px;
+  color: #b88e38;
+}
+
+/* ===================== Resumen de presencia ===================== */
+
+.presencia-resumen {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 8px 4px;
+}
+
+.presencia-resumen__dato {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.presencia-resumen__valor {
+  font-family: var(--fuente-titulo, 'Cinzel', serif);
+  font-size: 34px;
+  font-weight: 700;
+  color: #1a1714;
+}
+
+.presencia-resumen__etiqueta {
+  font-size: 13px;
+  font-weight: 600;
+  color: #4a4237;
+}
+
+.presencia-resumen__nota {
+  font-size: 12.5px;
+  color: #716a5f;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* ===================== Indicador de envío (outbox InfluxDB) ===================== */
+
+.monitoreo-outbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: #faf7f0;
+  border: 1px solid rgba(33, 25, 15, 0.1);
+}
+
+.monitoreo-outbox__punto {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background-color: #b3ab9c;
+}
+
+.monitoreo-outbox__punto--ok {
+  background-color: #2a9d8f;
+}
+
+.monitoreo-outbox__punto--aviso {
+  background-color: #e5a842;
+}
+
+.monitoreo-outbox__punto--error {
+  background-color: #e76f51;
+}
+
+.monitoreo-outbox__texto {
+  font-size: 12.5px;
+  color: #5a5247;
+}
+
+.monitoreo-outbox__texto--error {
+  color: #8a1f1f;
+}
+
+/* ===================== Alertas ambientales activas ===================== */
+
+.monitoreo-alertas-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.monitoreo-alerta-fila {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: #faf7f0;
+  border-left: 3px solid #e5a842;
+}
+
+.monitoreo-alerta-fila--critica {
+  border-left-color: #e76f51;
+}
+
+.monitoreo-alerta-fila__badge {
+  flex-shrink: 0;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  background: #fde8e4;
+  color: #b5442a;
+}
+
+.monitoreo-alerta-fila__info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.monitoreo-alerta-fila__descripcion {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #1a1714;
+}
+
+.monitoreo-alerta-fila__meta {
+  font-size: 12px;
+  color: #736c61;
+}
+
+.monitoreo-alerta-fila__fecha {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: #8c8273;
+}
+
+/* ===================== Gráficas históricas (InfluxDB) ===================== */
+
+.monitoreo-grafica-card--ancho {
+  grid-column: 1 / -1;
+}
+
+.monitoreo-grafica__bloque {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.monitoreo-grafica__bloque-titulo {
+  font-size: 13px;
+  font-weight: 600;
+  color: #4a4237;
+}
+
+.monitoreo-grafica__cuerpo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.monitoreo-grafica__cuerpo .grafica-svg {
+  width: 100%;
+  height: 160px;
+  background: #faf7f0;
+  border-radius: 8px;
+}
+
+.monitoreo-grafica__leyenda {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: #736c61;
 }

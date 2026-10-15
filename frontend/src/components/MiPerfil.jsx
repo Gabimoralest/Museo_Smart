@@ -11,22 +11,40 @@ import {
   IconoCandado,
   IconoOjo,
   IconoCheck,
-  IconoEscudo,
-  IconoCalendario,
-  IconoReloj,
-  IconoMonitor,
-  IconoDispositivo,
   IconoLlave,
 } from './iconos'
+import { cambiarContrasena } from '../data/authApi'
+import { ErrorHttp } from '../data/httpClient'
 import './MiPerfil.css'
 
-export default function MiPerfil({ sesion }) {
-  // Datos del perfil
-  const [nombre, setNombre] = useState(sesion?.nombre || 'Gabs')
-  const correo = sesion?.correo || '6gabymorales@gmail.com'
-  const rol = sesion?.rol || 'SuperAdmin'
+// Etiqueta visual del rol a partir del valor real del backend.
+function etiquetaRol(rol) {
+  if (rol === 'SUPERADMIN') return 'SuperAdmin'
+  if (rol === 'ADMIN') return 'Administrador'
+  return rol || '—'
+}
 
-  // Preferencias de notificaciones
+// Mensaje claro según el tipo/estado del error del cliente HTTP.
+function mensajeDeError(error, porDefecto) {
+  if (error instanceof ErrorHttp) {
+    if (error.tipo === 'conexion') {
+      return 'No pudimos conectar con el servidor. Verifica tu conexión e inténtalo de nuevo.'
+    }
+    if (error.tipo === 'autorizacion') {
+      return 'Tu sesión ha expirado. Inicia sesión de nuevo.'
+    }
+    return error.message || porDefecto
+  }
+  return porDefecto
+}
+
+export default function MiPerfil({ sesion }) {
+  // Datos reales del usuario autenticado (de la sesión).
+  const nombre = sesion?.nombre || sesion?.correo || '—'
+  const correo = sesion?.correo || '—'
+  const rol = etiquetaRol(sesion?.rol)
+
+  // Preferencias de notificaciones (solo UI; no hay endpoint que las persista).
   const [notifCriticas, setNotifCriticas] = useState(true)
   const [notifAdvertencia, setNotifAdvertencia] = useState(true)
   const [notifSistema, setNotifSistema] = useState(true)
@@ -40,44 +58,53 @@ export default function MiPerfil({ sesion }) {
   const [verNueva, setVerNueva] = useState(false)
   const [verConfirmar, setVerConfirmar] = useState(false)
 
+  const [enviando, setEnviando] = useState(false)
   const [mensajeExito, setMensajeExito] = useState('')
   const [mensajeError, setMensajeError] = useState('')
 
-  // Validaciones en tiempo real de la nueva contraseña
+  // Indicadores de la nueva contraseña. El backend solo exige longitud mínima
+  // de 8; el resto son recomendaciones visuales, no bloquean el envío.
   const tieneMinimo8 = passNueva.length >= 8
   const tieneMayuscula = /[A-Z]/.test(passNueva)
   const tieneMinuscula = /[a-z]/.test(passNueva)
   const tieneNumero = /[0-9]/.test(passNueva)
   const tieneEspecial = /[!@#$%^&*(),.?":{}|<>]/.test(passNueva)
 
-  const todosRequisitos =
-    tieneMinimo8 && tieneMayuscula && tieneMinuscula && tieneNumero && tieneEspecial
-
-  const handleActualizarPassword = (e) => {
+  const handleActualizarPassword = async (e) => {
     e.preventDefault()
+    if (enviando) return
     setMensajeError('')
     setMensajeExito('')
 
+    // Validaciones alineadas con el contrato real del backend.
     if (!passActual) {
       setMensajeError('Por favor ingresa tu contraseña actual.')
       return
     }
-
-    if (!todosRequisitos) {
-      setMensajeError('La nueva contraseña no cumple todos los requisitos de seguridad.')
+    if (!tieneMinimo8) {
+      setMensajeError('La nueva contraseña debe tener al menos 8 caracteres.')
       return
     }
-
     if (passNueva !== passConfirmar) {
       setMensajeError('La nueva contraseña y su confirmación no coinciden.')
       return
     }
 
-    setMensajeExito('Contraseña actualizada correctamente (simulación de datos).')
-    setPassActual('')
-    setPassNueva('')
-    setPassConfirmar('')
-    setTimeout(() => setMensajeExito(''), 4000)
+    setEnviando(true)
+    try {
+      await cambiarContrasena({ contrasenaActual: passActual, nuevaContrasena: passNueva })
+      setPassActual('')
+      setPassNueva('')
+      setPassConfirmar('')
+      setMensajeExito(
+        'Contraseña actualizada correctamente. Por seguridad, tu sesión anterior quedó ' +
+          'invalidada: vuelve a iniciar sesión con tu nueva contraseña.',
+      )
+    } catch (error) {
+      setMensajeError(mensajeDeError(error, 'No se pudo actualizar la contraseña.'))
+    } finally {
+      setEnviando(false)
+    }
   }
 
   return (
@@ -107,7 +134,7 @@ export default function MiPerfil({ sesion }) {
               {/* Avatar y Datos Principales */}
               <div className="perfil-avatar-seccion">
                 <div className="perfil-avatar-wrap">
-                  <div className="perfil-avatar-letra">{nombre.charAt(0) || 'G'}</div>
+                  <div className="perfil-avatar-letra">{nombre.trim().charAt(0).toUpperCase() || '?'}</div>
                   <button
                     type="button"
                     className="perfil-avatar-camara"
@@ -120,15 +147,17 @@ export default function MiPerfil({ sesion }) {
                 <div className="perfil-avatar-meta">
                   <div className="perfil-avatar-nombre-fila">
                     <span className="perfil-avatar-nombre">{nombre}</span>
-                    <span className="perfil-avatar-corona">
-                      <IconoCorona />
-                    </span>
+                    {sesion?.rol === 'SUPERADMIN' && (
+                      <span className="perfil-avatar-corona">
+                        <IconoCorona />
+                      </span>
+                    )}
                   </div>
                   <span className="perfil-avatar-rol">{rol}</span>
                 </div>
               </div>
 
-              {/* Formulario de Información Personal */}
+              {/* Información personal (solo lectura: no hay endpoint de edición de perfil) */}
               <div className="perfil-campo">
                 <label htmlFor="perfil-nombre" className="perfil-campo__label">
                   Nombre completo
@@ -136,9 +165,10 @@ export default function MiPerfil({ sesion }) {
                 <input
                   id="perfil-nombre"
                   type="text"
-                  className="perfil-campo__input"
+                  className="perfil-campo__input perfil-campo__input--deshabilitado"
                   value={nombre}
-                  onChange={(e) => setNombre(e.target.value)}
+                  disabled
+                  readOnly
                 />
               </div>
 
@@ -388,64 +418,12 @@ export default function MiPerfil({ sesion }) {
               {mensajeExito && <div className="perfil-alerta-exito">{mensajeExito}</div>}
 
               <div className="perfil-accion-wrap">
-                <button type="submit" className="perfil-btn-actualizar">
+                <button type="submit" className="perfil-btn-actualizar" disabled={enviando}>
                   <IconoLlave />
-                  <span>Actualizar contraseña</span>
+                  <span>{enviando ? 'Actualizando…' : 'Actualizar contraseña'}</span>
                 </button>
               </div>
             </form>
-          </article>
-
-          {/* Tarjeta: Información de la cuenta */}
-          <article className="perfil-card">
-            <header className="perfil-card__header">
-              <span className="perfil-card__header-icono">
-                <IconoEscudo />
-              </span>
-              <h2 className="perfil-card__titulo">Información de la cuenta</h2>
-            </header>
-
-            <div className="perfil-card__cuerpo perfil-info-cuenta-lista">
-              <div className="cuenta-dato-fila">
-                <span className="cuenta-dato__icono">
-                  <IconoCalendario />
-                </span>
-                <span className="cuenta-dato__label">Fecha de creación</span>
-                <span className="cuenta-dato__valor">01/10/2026 09:15 a. m.</span>
-              </div>
-
-              <div className="cuenta-dato-fila">
-                <span className="cuenta-dato__icono">
-                  <IconoReloj />
-                </span>
-                <span className="cuenta-dato__label">Última actualización</span>
-                <span className="cuenta-dato__valor">01/10/2026 09:15 a. m.</span>
-              </div>
-
-              <div className="cuenta-dato-fila">
-                <span className="cuenta-dato__icono">
-                  <IconoLlave />
-                </span>
-                <span className="cuenta-dato__label">Último inicio de sesión</span>
-                <span className="cuenta-dato__valor">13/10/2026 10:24 a. m.</span>
-              </div>
-
-              <div className="cuenta-dato-fila">
-                <span className="cuenta-dato__icono">
-                  <IconoMonitor />
-                </span>
-                <span className="cuenta-dato__label">Dirección IP (último acceso)</span>
-                <span className="cuenta-dato__valor">181.62.12.45</span>
-              </div>
-
-              <div className="cuenta-dato-fila">
-                <span className="cuenta-dato__icono">
-                  <IconoDispositivo />
-                </span>
-                <span className="cuenta-dato__label">Dispositivo (último acceso)</span>
-                <span className="cuenta-dato__valor">Windows · Chrome</span>
-              </div>
-            </div>
           </article>
         </div>
       </div>

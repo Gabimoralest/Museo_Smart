@@ -521,6 +521,12 @@
   transform: translateY(-1px);
 }
 
+.perfil-btn-actualizar:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .perfil-btn-actualizar svg {
   width: 16px;
   height: 16px;

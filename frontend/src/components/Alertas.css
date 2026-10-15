@@ -635,6 +635,12 @@
   transform: translateY(-1px);
 }
 
+.alerta-btn-resolver:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .alerta-btn-resolver svg {
   width: 16px;
   height: 16px;
@@ -656,6 +662,86 @@
 .alerta-resuelta-aviso svg {
   width: 16px;
   height: 16px;
+}
+
+/* ===================== Aviso de resultado (resolver) ===================== */
+
+.alertas-aviso {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.alertas-aviso svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.alertas-aviso--exito {
+  background: #e6f9ed;
+  color: #1e3d2b;
+  border: 1px solid rgba(43, 138, 62, 0.35);
+}
+
+.alertas-aviso--error {
+  background: #fbeceb;
+  color: #8a1f1f;
+  border: 1px solid rgba(201, 42, 42, 0.35);
+}
+
+/* ===================== Estados de la tabla (carga/error/vacío) ===================== */
+
+.alertas-estado {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  text-align: center;
+  padding: 48px 24px;
+}
+
+.alertas-estado__texto {
+  font-size: 14.5px;
+  color: #716a5f;
+  max-width: 440px;
+}
+
+.alertas-estado__icono {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #fbeceb;
+  color: #c92a2a;
+}
+
+.alertas-estado__icono svg {
+  width: 22px;
+  height: 22px;
+}
+
+.alertas-estado__boton {
+  padding: 10px 20px;
+  border-radius: 999px;
+  background: #21190f;
+  color: #f7f2e9;
+  border: none;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.15s ease;
+}
+
+.alertas-estado__boton:hover {
+  background: #36291a;
+  transform: translateY(-1px);
 }
 
 /* ===================== Responsive ===================== */

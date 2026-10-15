@@ -87,6 +87,9 @@ public class SecurityConfig {
                         // Ranking de popularidad (administracion): ADMIN y SUPERADMIN.
                         .requestMatchers("/api/v1/admin/popularidad/**").hasAnyRole("ADMIN", "SUPERADMIN")
 
+                        // Monitoreo IoT (lecturas recientes y resumen): ADMIN y SUPERADMIN.
+                        .requestMatchers("/api/v1/admin/monitoreo/**").hasAnyRole("ADMIN", "SUPERADMIN")
+
                         // Gestion de cuentas de administradores: SOLO SUPERADMIN.
                         // Debe ir antes de anyRequest() para que no quede anulada.
                         .requestMatchers("/api/v1/admin/usuarios/**").hasRole("SUPERADMIN")

@@ -112,3 +112,37 @@ export async function restablecerContrasena(
     }),
   )
 }
+
+/**
+ * Cambia la contraseña del administrador autenticado (cambio ordinario desde
+ * "Mi perfil"). Requiere sesión: envía el token Bearer.
+ *
+ * Endpoint real (AuthController): POST /api/v1/auth/cambiar-contrasena
+ *   body: { contrasenaActual, nuevaContrasena } -> 204 sin cuerpo
+ *
+ * IMPORTANTE: al confirmar, el backend incrementa la versión de seguridad del
+ * token, por lo que el JWT actual queda invalidado y hay que iniciar sesión de
+ * nuevo. El llamador debe gestionar esa consecuencia (no se hace aquí para no
+ * afectar la lógica de sesión).
+ *
+ * @param {{contrasenaActual: string, nuevaContrasena: string}} datos
+ * @param {{signal?: AbortSignal}} [opciones]
+ * @returns {Promise<object>} {} (204 sin cuerpo)
+ */
+export async function cambiarContrasena(
+  { contrasenaActual, nuevaContrasena },
+  { signal } = {},
+) {
+  if (MODO_MOCK) {
+    // En modo mock no hay backend: se simula éxito sin alterar la sesión.
+    return {}
+  }
+  return ejecutar(
+    solicitarJson(RUTA_CAMBIAR_CONTRASENA, {
+      method: 'POST',
+      datos: { contrasenaActual, nuevaContrasena },
+      autenticado: true,
+      signal,
+    }),
+  )
+}
