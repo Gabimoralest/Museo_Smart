@@ -23,14 +23,16 @@ import java.util.List;
  * tiene primerInicioSesion=true. Debe cambiar la contrasena antes. La
  * comprobacion es efectiva en el backend, no solo en el cliente.
  *
- * Cubre las rutas de administracion de exhibiciones y de gestion de usuarios.
+ * Cubre las rutas de administracion de exhibiciones, gestion de usuarios y el
+ * ranking de popularidad (operacion administrativa).
  */
 @Component
 public class PrimerInicioSesionFilter extends OncePerRequestFilter {
 
     private static final List<String> RUTAS_PROTEGIDAS = List.of(
             "/api/v1/admin/exhibiciones",
-            "/api/v1/admin/usuarios");
+            "/api/v1/admin/usuarios",
+            "/api/v1/admin/popularidad");
 
     private final ObjectMapper objectMapper;
 

@@ -1,0 +1,577 @@
+/* ============================================================
+   Mi perfil — Museo_Smart
+   ------------------------------------------------------------
+   Estilos idénticos a la imagen de referencia media_1792007351246.png
+   ============================================================ */
+
+.mi-perfil-vista {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* ===================== Cabecera de Página ===================== */
+
+.perfil-cabecera {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.perfil-cabecera__titulo {
+  font-family: var(--fuente-titulo, 'Cinzel', serif);
+  font-size: 30px;
+  font-weight: 700;
+  color: #1a1714;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.perfil-cabecera__subtitulo {
+  font-size: 14.5px;
+  color: #736c61;
+  margin: 0;
+}
+
+/* ===================== Grid de 2 Columnas ===================== */
+
+.perfil-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 22px;
+  align-items: start;
+}
+
+.perfil-columna {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+/* ===================== Tarjetas ===================== */
+
+.perfil-card {
+  background: #ffffff;
+  border: 1px solid rgba(33, 25, 15, 0.08);
+  border-radius: 14px;
+  padding: 24px 26px;
+  box-shadow: 0 4px 20px -8px rgba(33, 25, 15, 0.05);
+  display: flex;
+  flex-direction: column;
+}
+
+.perfil-card__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 22px;
+}
+
+.perfil-card__header-icono {
+  width: 24px;
+  height: 24px;
+  color: #9e742e;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.perfil-card__header-icono svg {
+  width: 100%;
+  height: 100%;
+}
+
+.perfil-card__header-textos {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.perfil-card__titulo {
+  font-family: var(--fuente-titulo, 'Cinzel', serif);
+  font-size: 17px;
+  font-weight: 700;
+  color: #1a1714;
+  margin: 0;
+}
+
+.perfil-card__subtitulo {
+  font-size: 12.5px;
+  color: #736c61;
+  margin: 0;
+}
+
+.perfil-card__cuerpo {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ===================== Avatar y Metadatos ===================== */
+
+.perfil-avatar-seccion {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 6px;
+}
+
+.perfil-avatar-wrap {
+  position: relative;
+  width: 74px;
+  height: 74px;
+  flex-shrink: 0;
+}
+
+.perfil-avatar-letra {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: #684e36;
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  font-family: var(--fuente-titulo, 'Cinzel', serif);
+  font-size: 32px;
+  font-weight: 700;
+  box-shadow: 0 4px 12px rgba(104, 78, 54, 0.25);
+}
+
+.perfil-avatar-camara {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #1a1714;
+  border: 2px solid #ffffff;
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.perfil-avatar-camara:hover {
+  background: #9e742e;
+  transform: scale(1.1);
+}
+
+.perfil-avatar-camara svg {
+  width: 13px;
+  height: 13px;
+}
+
+.perfil-avatar-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.perfil-avatar-nombre-fila {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.perfil-avatar-nombre {
+  font-family: var(--fuente-titulo, 'Cinzel', serif);
+  font-size: 19px;
+  font-weight: 700;
+  color: #1a1714;
+}
+
+.perfil-avatar-corona {
+  color: #d4af37;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+}
+
+.perfil-avatar-corona svg {
+  width: 100%;
+  height: 100%;
+}
+
+.perfil-avatar-rol {
+  font-size: 13px;
+  color: #736c61;
+}
+
+/* ===================== Campos de Formulario ===================== */
+
+.perfil-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.perfil-campo__label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #2b251e;
+}
+
+.perfil-campo__input {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(33, 25, 15, 0.14);
+  background: #ffffff;
+  font-size: 14px;
+  color: #1a1714;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.perfil-campo__input:focus {
+  border-color: #9e742e;
+  box-shadow: 0 0 0 3px rgba(158, 116, 46, 0.12);
+}
+
+.perfil-campo__input--deshabilitado {
+  background: #ece7de;
+  color: #635b50;
+  cursor: not-allowed;
+  border-color: rgba(33, 25, 15, 0.08);
+}
+
+/* Input password con botón de visibilidad */
+.perfil-input-password-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.perfil-input-password-wrap .perfil-campo__input {
+  padding-right: 42px;
+}
+
+.perfil-btn-ojo {
+  position: absolute;
+  right: 12px;
+  background: transparent;
+  border: none;
+  color: #8c8273;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  transition: color 0.2s ease;
+}
+
+.perfil-btn-ojo:hover {
+  color: #1a1714;
+}
+
+.perfil-btn-ojo svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* Aviso informativo */
+.perfil-aviso-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: #fcf8ef;
+  border: 1px solid #ebd9b3;
+  margin-top: 4px;
+}
+
+.perfil-aviso-info__icono {
+  color: #b88e38;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.perfil-aviso-info__icono svg {
+  width: 100%;
+  height: 100%;
+}
+
+.perfil-aviso-info__texto {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #635742;
+  margin: 0;
+}
+
+/* ===================== Notificaciones Switches ===================== */
+
+.perfil-notificaciones-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.notif-fila {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 4px 0;
+}
+
+.notif-fila__icono {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.notif-fila__icono svg {
+  width: 18px;
+  height: 18px;
+}
+
+.notif-fila__icono--alerta {
+  background: #fdeee7;
+  color: #d96b43;
+}
+
+.notif-fila__icono--aviso {
+  background: #fdf4e3;
+  color: #c78619;
+}
+
+.notif-fila__icono--sistema {
+  background: #f3ede2;
+  color: #8c7755;
+}
+
+.notif-fila__textos {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  gap: 2px;
+}
+
+.notif-fila__titulo {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #1a1714;
+}
+
+.notif-fila__desc {
+  font-size: 12px;
+  color: #736c61;
+}
+
+/* Switch toggle interactivo */
+.switch-toggle {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.switch-toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.switch-slider {
+  position: absolute;
+  inset: 0;
+  background-color: #d8d1c5;
+  border-radius: 24px;
+  transition: 0.25s ease;
+}
+
+.switch-slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: 0.25s ease;
+}
+
+.switch-toggle input:checked + .switch-slider {
+  background-color: #9e742e;
+}
+
+.switch-toggle input:checked + .switch-slider:before {
+  transform: translateX(20px);
+}
+
+/* ===================== Requisitos de Contraseña ===================== */
+
+.perfil-requisitos-box {
+  background: #fcf8ef;
+  border: 1px solid rgba(198, 161, 91, 0.25);
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.perfil-requisitos-titulo {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #2b251e;
+}
+
+.perfil-requisitos-lista {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.requisito-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #8c8273;
+  transition: color 0.2s ease;
+}
+
+.requisito-item--cumplido {
+  color: #9e742e;
+  font-weight: 600;
+}
+
+.requisito-check {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.requisito-check svg {
+  width: 100%;
+  height: 100%;
+}
+
+.requisito-item--cumplido .requisito-check {
+  color: #9e742e;
+}
+
+.perfil-alerta-error {
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #fde8e4;
+  color: #d94b2b;
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.perfil-alerta-exito {
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #e8f5e9;
+  color: #2e7d32;
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.perfil-accion-wrap {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.perfil-btn-actualizar {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 8px;
+  background: #9e742e;
+  color: #ffffff;
+  border: none;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.perfil-btn-actualizar:hover {
+  background: #876223;
+  transform: translateY(-1px);
+}
+
+.perfil-btn-actualizar svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* ===================== Información de la cuenta ===================== */
+
+.perfil-info-cuenta-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.cuenta-dato-fila {
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.cuenta-dato__icono {
+  width: 20px;
+  height: 20px;
+  color: #8c8273;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.cuenta-dato__icono svg {
+  width: 100%;
+  height: 100%;
+}
+
+.cuenta-dato__label {
+  color: #4a4237;
+  font-weight: 500;
+  flex: 1;
+}
+
+.cuenta-dato__valor {
+  color: #1a1714;
+  font-weight: 600;
+  text-align: right;
+}
+
+/* ===================== Responsive ===================== */
+
+@media (max-width: 1024px) {
+  .perfil-grid {
+    grid-template-columns: 1fr;
+  }
+}

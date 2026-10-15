@@ -29,6 +29,9 @@ pnpm-debug.log*
 .DS_Store
 Thumbs.db
 
+# --- Copia suelta/duplicada de imagenes en la raiz (no referenciada por el frontend) ---
+/public/
+
 # --- Docker / datos persistentes locales ---
 docker/data/
 # Hash de credenciales MQTT generado en runtime (nunca versionar).

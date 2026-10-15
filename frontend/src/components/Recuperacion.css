@@ -1,0 +1,284 @@
+/* ============================================================
+   Recuperación de contraseña — reutiliza Login.css para el panel,
+   la marca, los campos, botones y alertas. Aquí solo se añade lo
+   específico del flujo por pasos.
+   ============================================================ */
+
+/* ===================== Indicador de progreso ===================== */
+
+.recuperar__pasos {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 6px;
+  margin-top: 24px;
+}
+
+.recuperar__paso {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  text-align: center;
+}
+
+/* Línea conectora entre pasos. */
+.recuperar__paso::before {
+  content: '';
+  position: absolute;
+  top: 14px;
+  left: -50%;
+  width: 100%;
+  height: 1px;
+  background: rgba(168, 164, 155, 0.3);
+}
+
+.recuperar__paso:first-child::before {
+  display: none;
+}
+
+.recuperar__paso--completado::before,
+.recuperar__paso--activo::before {
+  background: var(--color-oro);
+}
+
+.recuperar__paso-marca {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid rgba(168, 164, 155, 0.45);
+  background: rgba(10, 13, 17, 0.8);
+  color: var(--color-texto-tenue);
+  font-size: 13px;
+  font-weight: 600;
+  transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
+}
+
+.recuperar__paso-marca svg {
+  width: 15px;
+  height: 15px;
+}
+
+.recuperar__paso--activo .recuperar__paso-marca {
+  border-color: var(--color-oro);
+  background: linear-gradient(180deg, var(--color-oro-claro), var(--color-oro));
+  color: #221a08;
+}
+
+.recuperar__paso--completado .recuperar__paso-marca {
+  border-color: var(--color-oro);
+  color: var(--color-oro);
+}
+
+.recuperar__paso-nombre {
+  font-size: 12px;
+  letter-spacing: 0.4px;
+  color: var(--color-texto-tenue);
+}
+
+.recuperar__paso--activo .recuperar__paso-nombre,
+.recuperar__paso--completado .recuperar__paso-nombre {
+  color: var(--color-crema);
+}
+
+/* ===================== Casillas del código ===================== */
+
+.recuperar__codigo {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 10px;
+}
+
+.recuperar__casilla {
+  width: 100%;
+  min-height: 58px;
+  text-align: center;
+  font-size: 24px;
+  font-weight: 600;
+  padding: 6px 0;
+  border-radius: 10px;
+  border: 1px solid rgba(168, 164, 155, 0.35);
+  background: rgba(10, 13, 17, 0.72);
+  color: var(--color-crema);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.recuperar__casilla:focus {
+  outline: none;
+  border-color: var(--color-oro);
+  box-shadow: 0 0 0 3px rgba(214, 178, 106, 0.18);
+}
+
+.recuperar__casilla--error {
+  border-color: #c9605c;
+}
+
+.recuperar__casilla:disabled {
+  opacity: 0.6;
+}
+
+.recuperar__correo {
+  color: var(--color-oro-claro);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.recuperar__reenvio {
+  margin-top: 2px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--color-texto-tenue);
+}
+
+.recuperar__reenvio .login__recuperar {
+  font-size: 14px;
+  vertical-align: baseline;
+}
+
+/* ===================== Requisitos de contraseña ===================== */
+
+.recuperar__requisitos {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid rgba(168, 164, 155, 0.18);
+  border-radius: 10px;
+  background: rgba(10, 13, 17, 0.4);
+}
+
+.recuperar__requisito {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13.5px;
+  color: var(--color-texto-tenue);
+  transition: color 0.2s ease;
+}
+
+.recuperar__requisito-marca {
+  display: grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+  color: var(--color-texto-tenue);
+}
+
+.recuperar__requisito-marca svg {
+  width: 15px;
+  height: 15px;
+}
+
+.recuperar__punto {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1px solid rgba(168, 164, 155, 0.6);
+}
+
+.recuperar__requisito--cumple {
+  color: var(--color-crema);
+}
+
+.recuperar__requisito--cumple .recuperar__requisito-marca {
+  color: var(--color-oro);
+}
+
+.recuperar__requisito--obligatorio.recuperar__requisito--cumple {
+  color: var(--color-crema);
+}
+
+/* Texto solo para lectores de pantalla. */
+.recuperar__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ===================== Confirmación final ===================== */
+
+.recuperar__confirmacion {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  margin-top: 26px;
+}
+
+.recuperar__confirmacion-icono {
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  margin-bottom: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--color-oro);
+  background: rgba(214, 178, 106, 0.12);
+  color: var(--color-oro);
+}
+
+.recuperar__confirmacion-icono svg {
+  width: 30px;
+  height: 30px;
+}
+
+.recuperar__confirmacion .login__subtitulo {
+  margin-top: 10px;
+  max-width: 34ch;
+}
+
+.recuperar__confirmacion .login__boton {
+  margin-top: 24px;
+}
+
+/* ===================== Adaptación móvil ===================== */
+
+@media (max-width: 600px) {
+  .recuperar__paso-nombre {
+    font-size: 11px;
+  }
+
+  .recuperar__codigo {
+    gap: 7px;
+  }
+
+  .recuperar__casilla {
+    min-height: 52px;
+    font-size: 21px;
+  }
+}
+
+@media (max-width: 360px) {
+  .recuperar__codigo {
+    gap: 5px;
+  }
+
+  .recuperar__casilla {
+    min-height: 46px;
+    font-size: 19px;
+  }
+
+  .recuperar__paso-nombre {
+    display: none;
+  }
+}
+
+/* ===================== Movimiento reducido ===================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .recuperar__paso-marca,
+  .recuperar__requisito {
+    transition: none;
+  }
+}

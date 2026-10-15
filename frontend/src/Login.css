@@ -1,0 +1,456 @@
+.login {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(18px, 3vh, 34px);
+  padding: clamp(20px, 4vh, 48px) 16px;
+  padding-left: max(16px, env(safe-area-inset-left));
+  padding-right: max(16px, env(safe-area-inset-right));
+  background-color: #0b0e12;
+  background-image: linear-gradient(
+      180deg,
+      rgba(8, 10, 14, 0.6) 0%,
+      rgba(8, 10, 14, 0.42) 45%,
+      rgba(8, 10, 14, 0.72) 100%
+    ),
+    url('/images/inicio-fondo.png');
+  background-size: cover, cover;
+  background-position: center center, center center;
+  background-repeat: no-repeat, no-repeat;
+  background-attachment: scroll;
+}
+
+/* ===================== Panel ===================== */
+
+.login__panel {
+  position: relative;
+  width: 100%;
+  max-width: 490px;
+  display: flex;
+  flex-direction: column;
+  padding: clamp(24px, 4vw, 40px) clamp(22px, 3.4vw, 38px);
+  border: 1px solid rgba(214, 178, 106, 0.35);
+  border-radius: 18px;
+  background: rgba(15, 18, 23, 0.82);
+  box-shadow: rgba(0, 0, 0, 0.6) 0 30px 70px -24px;
+  backdrop-filter: blur(8px);
+}
+
+/* ===================== Marca ===================== */
+
+.login__marca {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.login__marca-icono {
+  width: 42px;
+  height: 42px;
+  color: var(--color-oro);
+}
+
+.login__marca-texto {
+  font-family: var(--fuente-titulo);
+  font-size: clamp(22px, 2.4vw, 26px);
+  letter-spacing: 1px;
+  color: var(--color-crema);
+}
+
+.login__marca-texto em {
+  font-style: normal;
+  color: var(--color-oro);
+  font-weight: 700;
+}
+
+/* ===================== Cabecera ===================== */
+
+.login__cabecera {
+  margin-top: 22px;
+  text-align: center;
+}
+
+.login__titulo {
+  font-family: var(--fuente-titulo);
+  font-size: clamp(24px, 2.8vw, 30px);
+  font-weight: 500;
+  color: var(--color-crema);
+}
+
+.login__subtitulo {
+  margin-top: 6px;
+  font-size: 15px;
+  color: var(--color-texto-tenue);
+}
+
+/* ===================== Formulario ===================== */
+
+.login__form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-top: 26px;
+}
+
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.campo__etiqueta {
+  font-size: 13px;
+  letter-spacing: 0.4px;
+  color: var(--color-texto);
+}
+
+.campo__control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  min-height: 50px;
+  border: 1px solid rgba(168, 164, 155, 0.35);
+  border-radius: 10px;
+  background: rgba(10, 13, 17, 0.72);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.campo__control:focus-within {
+  border-color: var(--color-oro);
+  box-shadow: 0 0 0 3px rgba(214, 178, 106, 0.18);
+}
+
+.campo__control--error {
+  border-color: #c9605c;
+}
+
+.campo__control--error:focus-within {
+  border-color: #c9605c;
+  box-shadow: 0 0 0 3px rgba(201, 96, 92, 0.2);
+}
+
+.campo__icono {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  color: var(--color-texto-tenue);
+}
+
+.campo__icono svg {
+  width: 100%;
+  height: 100%;
+}
+
+.campo__input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-texto);
+  font-size: 15px;
+  padding: 12px 0;
+}
+
+.campo__input::placeholder {
+  color: rgba(168, 164, 155, 0.75);
+}
+
+.campo__input:focus {
+  outline: none;
+}
+
+.campo__ver {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  color: var(--color-texto-tenue);
+  border-radius: 8px;
+  transition: color 0.2s ease;
+}
+
+.campo__ver:hover {
+  color: var(--color-oro-claro);
+}
+
+.campo__ver svg {
+  width: 20px;
+  height: 20px;
+}
+
+.campo__error {
+  font-size: 13px;
+  color: #e7929a;
+}
+
+/* ===================== Opciones ===================== */
+
+.login__opciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.recordar {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 14px;
+  color: var(--color-texto-tenue);
+  cursor: pointer;
+}
+
+.recordar input {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  border: 1px solid rgba(168, 164, 155, 0.5);
+  border-radius: 5px;
+  background: rgba(10, 13, 17, 0.7);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.recordar input::after {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: var(--color-oro);
+  transform: scale(0);
+  transition: transform 0.15s ease;
+}
+
+.recordar input:checked {
+  border-color: var(--color-oro);
+}
+
+.recordar input:checked::after {
+  transform: scale(1);
+}
+
+.login__recuperar {
+  font-size: 14px;
+  color: var(--color-oro-claro);
+  transition: color 0.2s ease;
+}
+
+.login__recuperar:hover {
+  color: var(--color-oro);
+  text-decoration: underline;
+}
+
+/* ===================== Botón principal ===================== */
+
+.login__boton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 50px;
+  padding: 12px 24px;
+  border-radius: 10px;
+  background: linear-gradient(180deg, var(--color-oro-claro), var(--color-oro));
+  color: #221a08;
+  font-size: 16px;
+  font-weight: 600;
+  transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+
+.login__boton:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: rgba(214, 178, 106, 0.4) 0 14px 26px -12px;
+}
+
+.login__boton:active:not(:disabled) {
+  transform: translateY(0);
+  filter: brightness(0.96);
+}
+
+.login__boton:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+}
+
+.login__spinner {
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  border: 2px solid rgba(34, 26, 8, 0.35);
+  border-top-color: #221a08;
+  animation: login-girar 0.7s linear infinite;
+}
+
+@keyframes login-girar {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ===================== Alertas ===================== */
+
+.login__alerta {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 2px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.login__alerta--error {
+  border: 1px solid rgba(201, 96, 92, 0.6);
+  background: rgba(74, 26, 28, 0.55);
+  color: #f3c9cc;
+}
+
+.login__alerta--aviso {
+  border: 1px solid rgba(214, 178, 106, 0.45);
+  background: rgba(214, 178, 106, 0.1);
+  color: var(--color-oro-claro);
+}
+
+.login__alerta-icono {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.login__alerta-icono svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* ===================== Separador ===================== */
+
+.login__separador {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 26px 0 20px;
+}
+
+.login__separador-linea {
+  flex: 1;
+  height: 1px;
+  background: rgba(244, 239, 228, 0.14);
+}
+
+.login__separador-icono {
+  width: 20px;
+  height: 20px;
+  color: var(--color-oro);
+  flex-shrink: 0;
+}
+
+/* ===================== Volver ===================== */
+
+.login__volver {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  align-self: center;
+  min-height: 44px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  font-size: 14px;
+  color: var(--color-texto);
+  transition: color 0.2s ease, background 0.2s ease;
+}
+
+.login__volver:hover {
+  color: var(--color-oro-claro);
+  background: rgba(214, 178, 106, 0.1);
+}
+
+.login__volver svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* ===================== Pie ===================== */
+
+.login__pie {
+  text-align: center;
+  color: rgba(168, 164, 155, 0.9);
+}
+
+.login__pie-titulo {
+  font-size: 13px;
+  letter-spacing: 0.6px;
+}
+
+.login__pie-creditos {
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+/* ===================== Adaptación móvil ===================== */
+
+@media (max-width: 600px) {
+  .login {
+    justify-content: flex-start;
+    padding-top: clamp(24px, 6vh, 44px);
+    padding-bottom: clamp(24px, 5vh, 40px);
+  }
+
+  .login__panel {
+    width: calc(100% - 32px);
+    max-width: 460px;
+    padding: 26px 20px;
+    border-radius: 16px;
+  }
+
+  .login__form {
+    gap: 16px;
+    margin-top: 22px;
+  }
+
+  .login__opciones {
+    gap: 8px;
+  }
+}
+
+@media (max-width: 360px) {
+  .login__panel {
+    padding: 22px 16px;
+  }
+
+  .login__marca-texto {
+    font-size: 20px;
+  }
+}
+
+/* ===================== Movimiento reducido ===================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .login__spinner {
+    animation-duration: 1.4s;
+  }
+
+  .login__boton,
+  .login__boton:hover:not(:disabled) {
+    transform: none;
+  }
+}

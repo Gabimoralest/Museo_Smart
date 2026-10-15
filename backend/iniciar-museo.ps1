@@ -56,6 +56,43 @@ function Get-EffectiveVar {
     return @{ Value = $null; Origin = $null }
 }
 
+# Lee docker\.env (fuente de verdad de Mosquitto/InfluxDB) y devuelve un mapa
+# clave -> valor. Ignora comentarios y lineas vacias, recorta comillas y
+# comentarios en linea. NUNCA imprime valores: solo se usan internamente.
+function Read-DockerEnv {
+    param([Parameter(Mandatory)][string]$Path)
+    $mapa = @{}
+    if (-not (Test-Path -LiteralPath $Path)) { return $mapa }
+    foreach ($linea in Get-Content -LiteralPath $Path) {
+        $t = $linea.Trim()
+        if ($t -eq '' -or $t.StartsWith('#')) { continue }
+        $idx = $t.IndexOf('=')
+        if ($idx -lt 1) { continue }
+        $k = $t.Substring(0, $idx).Trim()
+        $v = $t.Substring($idx + 1).Trim()
+        # Quitar comentario en linea (precedido por espacio) y comillas.
+        $v = ($v -replace '\s+#.*$', '').Trim()
+        $v = $v.Trim('"').Trim("'")
+        $mapa[$k] = $v
+    }
+    return $mapa
+}
+
+# Resuelve una variable priorizando el entorno existente y, si falta, el
+# docker\.env indicado. Devuelve @{ Value; Origin } sin exponer el valor.
+function Resolve-IotVar {
+    param(
+        [Parameter(Mandatory)][string]$Name,
+        [Parameter(Mandatory)][hashtable]$DockerEnv
+    )
+    $efectiva = Get-EffectiveVar -Name $Name
+    if ($efectiva.Value) { return $efectiva }
+    if ($DockerEnv.ContainsKey($Name) -and -not [string]::IsNullOrEmpty($DockerEnv[$Name])) {
+        return @{ Value = $DockerEnv[$Name]; Origin = 'docker\.env' }
+    }
+    return @{ Value = $null; Origin = $null }
+}
+
 function Test-TcpPort {
     param([Parameter(Mandatory)][string]$HostName, [Parameter(Mandatory)][int]$Port, [int]$TimeoutMs = 1500)
     $client = New-Object System.Net.Sockets.TcpClient
@@ -269,6 +306,76 @@ if ($env:APP_MAIL_HABILITADO -eq 'true') {
     Write-Warn2 "APP_MAIL_HABILITADO != true: se usara LoggingMailService (sin envio real de correos)."
 }
 
+# ---------------- 6b. MQTT e InfluxDB ----------------
+
+Write-Step "Configurando MQTT e InfluxDB (fuente: entorno o docker\.env)"
+
+# docker\.env es la misma fuente que usa Mosquitto/InfluxDB en Docker: evita
+# desincronizacion de credenciales. Ruta relativa al backend.
+$dockerEnvPath = Join-Path $scriptRoot '..\docker\.env'
+$dockerEnv = Read-DockerEnv -Path $dockerEnvPath
+if (Test-Path -LiteralPath $dockerEnvPath) {
+    Write-Ok "docker\.env encontrado; se usa como respaldo si falta una variable."
+} else {
+    Write-Warn2 "No se encontro docker\.env en '$dockerEnvPath'."
+}
+
+# URL del broker: Spring Boot en Windows siempre habla con el broker Docker
+# expuesto en el puerto host 1884.
+$env:MQTT_BROKER_URL = 'tcp://localhost:1884'
+Write-Ok "MQTT_BROKER_URL=tcp://localhost:1884"
+
+# MQTT_USERNAME: entorno existente o docker\.env.
+$mqttUser = Resolve-IotVar -Name 'MQTT_USERNAME' -DockerEnv $dockerEnv
+if ($mqttUser.Value) {
+    $env:MQTT_USERNAME = $mqttUser.Value
+    Write-Ok "MQTT_USERNAME cargado desde $($mqttUser.Origin)."
+} else {
+    Write-Warn2 "MQTT_USERNAME no encontrado."
+}
+
+# MQTT_PASSWORD: entorno existente o docker\.env; si falta, solicitud segura.
+$mqttPass = Resolve-IotVar -Name 'MQTT_PASSWORD' -DockerEnv $dockerEnv
+if ($mqttPass.Value) {
+    $env:MQTT_PASSWORD = $mqttPass.Value
+    Write-Ok "MQTT_PASSWORD cargada desde $($mqttPass.Origin), longitud=$($mqttPass.Value.Length)."
+} else {
+    Write-Warn2 "MQTT_PASSWORD no encontrada. Introduce la contrasena MQTT (no se mostrara):"
+    $mqttSec = Read-Host -Prompt "    MQTT_PASSWORD" -AsSecureString
+    $env:MQTT_PASSWORD = ConvertFrom-SecureStringToPlain -Secure $mqttSec
+    if ($env:MQTT_PASSWORD) {
+        Write-Ok "MQTT_PASSWORD establecida solo para esta sesion (longitud=$($env:MQTT_PASSWORD.Length))."
+    } else {
+        Write-Warn2 "Sin MQTT_PASSWORD: el broker Docker (allow_anonymous false) rechazara la conexion."
+    }
+}
+
+# Token de InfluxDB (necesario para drenar el outbox). Entorno o docker\.env.
+$influxToken = Resolve-IotVar -Name 'INFLUX_TOKEN' -DockerEnv $dockerEnv
+if ($influxToken.Value) {
+    $env:INFLUX_TOKEN = $influxToken.Value
+    Write-Ok "INFLUX_TOKEN cargado desde $($influxToken.Origin), longitud=$($influxToken.Value.Length)."
+} else {
+    Write-Warn2 "INFLUX_TOKEN no encontrado. Introduce el token de InfluxDB (no se mostrara):"
+    $influxSec = Read-Host -Prompt "    INFLUX_TOKEN" -AsSecureString
+    $env:INFLUX_TOKEN = ConvertFrom-SecureStringToPlain -Secure $influxSec
+    if ($env:INFLUX_TOKEN) {
+        Write-Ok "INFLUX_TOKEN establecido solo para esta sesion (longitud=$($env:INFLUX_TOKEN.Length))."
+    } else {
+        Write-Warn2 "Sin INFLUX_TOKEN: el drenado hacia InfluxDB quedara inactivo (no se pierden datos)."
+    }
+}
+
+# Organizacion y bucket: no son secretos; entorno, docker\.env o defaults.
+$influxOrg = Resolve-IotVar -Name 'INFLUX_ORG' -DockerEnv $dockerEnv
+$env:INFLUX_ORG = if ($influxOrg.Value) { $influxOrg.Value } else { 'museo_smart' }
+
+$influxBucket = Resolve-IotVar -Name 'INFLUX_BUCKET' -DockerEnv $dockerEnv
+$env:INFLUX_BUCKET = if ($influxBucket.Value) { $influxBucket.Value } else { 'museo_smart_ambiental' }
+
+$env:INFLUX_URL = 'http://localhost:8087'
+Write-Ok "INFLUX_URL=http://localhost:8087 (org/bucket definidos)."
+
 # ---------------- 7. Validaciones previas ----------------
 
 Write-Step "Validaciones previas"
@@ -296,6 +403,20 @@ if ($env:APP_MAIL_HABILITADO -eq 'true') {
     } else {
         Write-Ok "Configuracion SMTP completa."
     }
+}
+
+# MQTT: el broker Docker exige autenticacion (allow_anonymous false). Sin
+# usuario+contrasena la conexion fallara con MqttSecurityException. Abortamos
+# antes de arrancar para dar un error claro en lugar de uno confuso del broker.
+$mqttHabilitado = if ($env:MQTT_ENABLED) { $env:MQTT_ENABLED } else { 'true' }
+if ($mqttHabilitado -eq 'true') {
+    if ([string]::IsNullOrEmpty($env:MQTT_USERNAME) -or [string]::IsNullOrEmpty($env:MQTT_PASSWORD)) {
+        $errores += "MQTT habilitado pero falta MQTT_USERNAME/MQTT_PASSWORD (revisa el entorno o docker\.env)."
+    } else {
+        Write-Ok "Credenciales MQTT completas (usuario y contrasena definidos)."
+    }
+} else {
+    Write-Warn2 "MQTT_ENABLED != true: el consumidor MQTT no se iniciara."
 }
 
 if ($errores.Count -gt 0) {
@@ -326,6 +447,15 @@ Write-Host ("  MAIL_PASSWORD      : " + $mailResumen)
 
 $saResumen = if ($env:MUSEO_SUPERADMIN_EMAIL -and $env:MUSEO_SUPERADMIN_PASSWORD) { "si" } else { "no" }
 Write-Host ("  SuperAdmin bootstrap: " + $saResumen)
+
+Write-Host ("  MQTT_BROKER_URL    : " + $env:MQTT_BROKER_URL)
+$mqttPassResumen = if ($env:MQTT_PASSWORD) { "definida (len=" + $env:MQTT_PASSWORD.Length + ")" } else { "no definida" }
+Write-Host ("  MQTT_PASSWORD      : " + $mqttPassResumen)
+
+Write-Host ("  INFLUX_URL         : " + $env:INFLUX_URL)
+Write-Host ("  INFLUX_ORG/BUCKET  : " + $env:INFLUX_ORG + " / " + $env:INFLUX_BUCKET)
+$influxTokenResumen = if ($env:INFLUX_TOKEN) { "definido (len=" + $env:INFLUX_TOKEN.Length + ")" } else { "no definido" }
+Write-Host ("  INFLUX_TOKEN       : " + $influxTokenResumen)
 Write-Host "=========================================================" -ForegroundColor White
 Write-Host ""
 

@@ -66,9 +66,14 @@ services:
       TZ: ${TZ:-America/Bogota}
       NODE_RED_ENABLE_PROJECTS: "false"
       FLOWS: flows.json
+    # Seeder idempotente: copia museo-smart-flows.json a /data/flows.json solo
+    # si no existe o si /data/flows.json es el placeholder de la imagen; luego
+    # delega en el entrypoint oficial de Node-RED. No toca credenciales.
+    entrypoint: ["bash", "/usr/local/bin/museo-nodered-entrypoint.sh"]
     volumes:
       - nodered_data:/data
       - ./nodered:/data-import:ro
+      - ./nodered/nodered-entrypoint.sh:/usr/local/bin/museo-nodered-entrypoint.sh:ro
     networks:
       - museosmart-iot
     healthcheck:

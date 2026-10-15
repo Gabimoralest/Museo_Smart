@@ -65,6 +65,11 @@ public class SecurityConfig {
                                 "/api/v1/exhibiciones",
                                 "/api/v1/exhibiciones/*").permitAll()
 
+                        // Registro publico de interacciones anonimas con exhibiciones.
+                        // No requiere autenticacion; la validacion la realiza el backend.
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/v1/popularidad/visitas").permitAll()
+
                         // Swagger / OpenAPI / health en desarrollo.
                         .requestMatchers(
                                 "/v3/api-docs/**",
@@ -75,6 +80,12 @@ public class SecurityConfig {
 
                         // CRUD administrativo de exhibiciones: ADMIN y SUPERADMIN.
                         .requestMatchers("/api/v1/admin/exhibiciones/**").hasAnyRole("ADMIN", "SUPERADMIN")
+
+                        // Alertas ambientales: ADMIN y SUPERADMIN.
+                        .requestMatchers("/api/v1/admin/alertas/**").hasAnyRole("ADMIN", "SUPERADMIN")
+
+                        // Ranking de popularidad (administracion): ADMIN y SUPERADMIN.
+                        .requestMatchers("/api/v1/admin/popularidad/**").hasAnyRole("ADMIN", "SUPERADMIN")
 
                         // Gestion de cuentas de administradores: SOLO SUPERADMIN.
                         // Debe ir antes de anyRequest() para que no quede anulada.

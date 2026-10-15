@@ -12,6 +12,7 @@ import com.museosmart.iot.dto.MensajePresenciaDto;
 import com.museosmart.repository.MedicionPendienteRepository;
 import com.museosmart.repository.MensajeIotRepository;
 import com.museosmart.repository.SensorRepository;
+import com.museosmart.service.AlertaService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -50,17 +51,20 @@ public class MensajeIotService {
     private final MedicionPendienteRepository medicionPendienteRepository;
     private final SensorRepository sensorRepository;
     private final MensajeIotValidador validador;
+    private final AlertaService alertaService;
     private final ObjectMapper objectMapper;
 
     public MensajeIotService(MensajeIotRepository mensajeIotRepository,
                              MedicionPendienteRepository medicionPendienteRepository,
                              SensorRepository sensorRepository,
                              MensajeIotValidador validador,
+                             AlertaService alertaService,
                              ObjectMapper objectMapper) {
         this.mensajeIotRepository = mensajeIotRepository;
         this.medicionPendienteRepository = medicionPendienteRepository;
         this.sensorRepository = sensorRepository;
         this.validador = validador;
+        this.alertaService = alertaService;
         this.objectMapper = objectMapper;
     }
 
@@ -137,6 +141,10 @@ public class MensajeIotService {
         guardarMedicion(mensaje, sensor, "TEMPERATURA", dto.temperatura(), "C", dto.timestamp());
         guardarMedicion(mensaje, sensor, "HUMEDAD", dto.humedad(), "%", dto.timestamp());
         guardarMedicion(mensaje, sensor, "LUZ", dto.luminosidad(), "lux", dto.timestamp());
+
+        alertaService.evaluarAmbiental(sensor, "TEMPERATURA", dto.temperatura());
+        alertaService.evaluarAmbiental(sensor, "HUMEDAD", dto.humedad());
+        alertaService.evaluarAmbiental(sensor, "LUZ", dto.luminosidad());
     }
 
     private void procesarPresencia(MensajeIot mensaje) {
