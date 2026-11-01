@@ -161,7 +161,7 @@ class UsuarioAdminControllerTest {
     @Test
     @DisplayName("crear un administrador válido devuelve 201")
     void crear_ok() throws Exception {
-        when(usuarioAdminService.crear(eq("Gabs"), eq("nuevo@museo.com"), eq("ADMIN"), eq("Secreta123")))
+        when(usuarioAdminService.crear(eq("Gabs"), eq("nuevo@museo.com"), eq("Secreta123")))
                 .thenReturn(admin(10L, "ADMIN", "ACTIVO"));
 
         mockMvc.perform(post("/api/v1/admin/usuarios").with(superadmin())
@@ -180,7 +180,7 @@ class UsuarioAdminControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.erroresValidacion").isNotEmpty());
 
-        verify(usuarioAdminService, never()).crear(any(), any(), any(), any());
+        verify(usuarioAdminService, never()).crear(any(), any(), any());
     }
 
     @Test
@@ -195,7 +195,7 @@ class UsuarioAdminControllerTest {
     @Test
     @DisplayName("crear con correo duplicado devuelve 409")
     void crear_duplicado_409() throws Exception {
-        when(usuarioAdminService.crear(any(), any(), any(), any()))
+        when(usuarioAdminService.crear(any(), any(), any()))
                 .thenThrow(new ConflictoException("Ya existe un administrador con el correo nuevo@museo.com"));
 
         mockMvc.perform(post("/api/v1/admin/usuarios").with(superadmin())
@@ -219,19 +219,92 @@ class UsuarioAdminControllerTest {
     }
 
     @Test
-    @DisplayName("actualizar ignora contraseña y rol: el servicio solo recibe nombre y correo")
-    void actualizar_noCambiaRolNiContrasena() throws Exception {
+    @DisplayName("actualizar ignora la contraseña y el rol (rol ADMIN) del request")
+    void actualizar_ignoraRolYContrasena() throws Exception {
         when(usuarioAdminService.actualizar(anyLong(), any(), any()))
                 .thenReturn(admin(5L, "ADMIN", "ACTIVO"));
 
         mockMvc.perform(put("/api/v1/admin/usuarios/5").with(superadmin())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"nombre\":\"Otro\",\"correo\":\"y@museo.com\",\"rol\":\"SUPERADMIN\",\"contrasena\":\"NoDebeAplicarse1\"}"))
+                        .content("{\"nombre\":\"Otro\",\"correo\":\"y@museo.com\",\"rol\":\"ADMIN\",\"contrasena\":\"NoDebeAplicarse1\"}"))
                 .andExpect(status().isOk());
 
         verify(usuarioAdminService).actualizar(5L, "Otro", "y@museo.com");
+        verify(usuarioAdminService).validarRolNoEscalable("ADMIN");
     }
 
+    @Test
+    @DisplayName("crear con rol=SUPERADMIN devuelve 400 y no crea nada")
+    void crear_rolSuperAdmin_400() throws Exception {
+        org.mockito.Mockito.doThrow(new ReglaNegocioException(
+                        "No se puede crear ni asignar el rol SUPERADMIN: las cuentas del panel son siempre ADMIN"))
+                .when(usuarioAdminService).validarRolNoEscalable("SUPERADMIN");
+
+        mockMvc.perform(post("/api/v1/admin/usuarios").with(superadmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nombre\":\"Gabs\",\"correo\":\"nuevo@museo.com\",\"rol\":\"SUPERADMIN\",\"contrasena\":\"Secreta123\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.mensaje").value(
+                        org.hamcrest.Matchers.containsString("siempre ADMIN")));
+
+        verify(usuarioAdminService, never()).crear(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("actualizar con rol=SUPERADMIN devuelve 400")
+    void actualizar_rolSuperAdmin_400() throws Exception {
+        org.mockito.Mockito.doThrow(new ReglaNegocioException(
+                        "No se puede crear ni asignar el rol SUPERADMIN: las cuentas del panel son siempre ADMIN"))
+                .when(usuarioAdminService).validarRolNoEscalable("SUPERADMIN");
+
+        mockMvc.perform(put("/api/v1/admin/usuarios/5").with(superadmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nombre\":\"Otro\",\"correo\":\"y@museo.com\",\"rol\":\"SUPERADMIN\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("editar la cuenta SuperAdmin devuelve 403")
+    void actualizar_superAdminProtegido_403() throws Exception {
+        when(usuarioAdminService.actualizar(anyLong(), any(), any()))
+                .thenThrow(new com.museosmart.exception.OperacionProhibidaException(
+                        "La cuenta de SuperAdmin no se puede modificar desde el panel"));
+
+        mockMvc.perform(put("/api/v1/admin/usuarios/1").with(superadmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nombre\":\"Otro\",\"correo\":\"y@museo.com\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.mensaje").value(
+                        "La cuenta de SuperAdmin no se puede modificar desde el panel"));
+    }
+
+    @Test
+    @DisplayName("desactivar la cuenta SuperAdmin devuelve 403")
+    void cambiarEstado_superAdminProtegido_403() throws Exception {
+        when(usuarioAdminService.cambiarEstado(anyLong(), any()))
+                .thenThrow(new com.museosmart.exception.OperacionProhibidaException(
+                        "La cuenta de SuperAdmin no se puede modificar desde el panel"));
+
+        mockMvc.perform(patch("/api/v1/admin/usuarios/1/estado").with(superadmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"estado\":\"INACTIVO\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.mensaje").value(
+                        "La cuenta de SuperAdmin no se puede modificar desde el panel"));
+    }
+
+    @Test
+    @DisplayName("eliminar la cuenta SuperAdmin devuelve 403")
+    void eliminar_superAdminProtegido_403() throws Exception {
+        org.mockito.Mockito.doThrow(new com.museosmart.exception.OperacionProhibidaException(
+                        "La cuenta de SuperAdmin no se puede modificar desde el panel"))
+                .when(usuarioAdminService).eliminar(1L);
+
+        mockMvc.perform(delete("/api/v1/admin/usuarios/1").with(superadmin()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.mensaje").value(
+                        "La cuenta de SuperAdmin no se puede modificar desde el panel"));
+    }
     @Test
     @DisplayName("actualizar un administrador inexistente devuelve 404")
     void actualizar_404() throws Exception {

@@ -70,6 +70,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST,
                                 "/api/v1/popularidad/visitas").permitAll()
 
+                        // Archivos multimedia (imagen/video): publicos, solo lectura.
+                        .requestMatchers(HttpMethod.GET, "/media/**").permitAll()
+
                         // Swagger / OpenAPI / health en desarrollo.
                         .requestMatchers(
                                 "/v3/api-docs/**",

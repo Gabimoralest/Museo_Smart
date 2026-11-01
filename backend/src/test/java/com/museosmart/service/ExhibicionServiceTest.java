@@ -1,10 +1,16 @@
 package com.museosmart.service;
 
 import com.museosmart.dto.CambioEstadoRequest;
+import com.museosmart.dto.EditarExhibicionRequest;
 import com.museosmart.entity.Exhibicion;
 import com.museosmart.exception.RecursoNoEncontradoException;
+import com.museosmart.repository.ExhibicionEdicionHistorialRepository;
+import com.museosmart.repository.ExhibicionEstadoHistorialRepository;
 import com.museosmart.repository.ExhibicionRepository;
 import com.museosmart.repository.SalaRepository;
+import com.museosmart.repository.ContenidoMultimediaRepository;
+import com.museosmart.repository.UsuarioAdminRepository;
+import com.museosmart.media.MediaStorageService;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,6 +47,21 @@ class ExhibicionServiceTest {
     private SalaRepository salaRepository;
 
     @Mock
+    private ExhibicionEdicionHistorialRepository edicionHistorialRepository;
+
+    @Mock
+    private ExhibicionEstadoHistorialRepository estadoHistorialRepository;
+
+    @Mock
+    private UsuarioAdminRepository usuarioAdminRepository;
+
+    @Mock
+    private ContenidoMultimediaRepository multimediaRepository;
+
+    @Mock
+    private MediaStorageService mediaStorage;
+
+    @Mock
     private EntityManager entityManager;
 
     @Mock
@@ -50,7 +71,9 @@ class ExhibicionServiceTest {
 
     @BeforeEach
     void setUp() {
-        exhibicionService = new ExhibicionService(exhibicionRepository, salaRepository);
+        exhibicionService = new ExhibicionService(exhibicionRepository, salaRepository,
+                edicionHistorialRepository, estadoHistorialRepository, usuarioAdminRepository,
+                multimediaRepository, mediaStorage);
         setEntityManager(exhibicionService, entityManager);
         lenient().when(entityManager.createNativeQuery(anyString())).thenReturn(query);
         lenient().when(query.setParameter(anyString(), any())).thenReturn(query);
@@ -213,6 +236,146 @@ class ExhibicionServiceTest {
         verify(exhibicionRepository, never()).save(any(Exhibicion.class));
     }
 
+    // ---------- Edicion ----------
+
+    @Test
+    @DisplayName("editar actualiza los campos y registra una fila por campo cambiado")
+    void editar_registraHistorialPorCampo() {
+        Exhibicion existente = exhibicion("pintura-historica-01");
+        existente.setVersion(2);
+        existente.setDescripcionCorta("corta vieja");
+        existente.setDescripcion("vieja");
+        existente.setAutorCultura("Anonimo");
+        when(exhibicionRepository.findById(5L)).thenReturn(Optional.of(existente));
+        when(exhibicionRepository.save(any(Exhibicion.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(usuarioAdminRepository.findById(9L)).thenReturn(Optional.empty());
+
+        Exhibicion resultado = exhibicionService.editar(5L,
+                new EditarExhibicionRequest("Nuevo titulo", "corta nueva", "desc nueva",
+                        "1851", "Oleo", "EEUU", "dato", 2), 9L);
+
+        assertThat(resultado.getTitulo()).isEqualTo("Nuevo titulo");
+        assertThat(resultado.getDescripcionCorta()).isEqualTo("corta nueva");
+        assertThat(resultado.getDescripcion()).isEqualTo("desc nueva");
+        assertThat(resultado.getPeriodo()).isEqualTo("1851");
+        assertThat(resultado.getMaterial()).isEqualTo("Oleo");
+        assertThat(resultado.getAutorCultura()).isEqualTo("EEUU");
+        assertThat(resultado.getDatoCurioso()).isEqualTo("dato");
+        verify(edicionHistorialRepository, org.mockito.Mockito.times(7)).save(any());
+    }
+
+    @Test
+    @DisplayName("editar sin cambios reales no escribe historial ni guarda")
+    void editar_sinCambiosNoHaceNada() {
+        Exhibicion existente = exhibicion("pintura-historica-01");
+        existente.setVersion(1);
+        existente.setDescripcionCorta("corta");
+        existente.setDescripcion("igual");
+        existente.setAutorCultura("Anonimo");
+        when(exhibicionRepository.findById(5L)).thenReturn(Optional.of(existente));
+
+        exhibicionService.editar(5L,
+                new EditarExhibicionRequest("[PROVISIONAL] pintura-historica-01", "corta",
+                        "igual", null, null, "Anonimo", null, 1), 9L);
+
+        verify(exhibicionRepository, never()).save(any(Exhibicion.class));
+        verify(edicionHistorialRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("editar con version obsoleta lanza ConflictoException (409)")
+    void editar_versionObsoleta_lanzaConflicto() {
+        Exhibicion existente = exhibicion("pintura-historica-01");
+        existente.setVersion(5);
+        when(exhibicionRepository.findById(5L)).thenReturn(Optional.of(existente));
+
+        assertThatThrownBy(() -> exhibicionService.editar(5L,
+                new EditarExhibicionRequest("Otro", "corta", null, null, null, null, null, 3), 9L))
+                .isInstanceOf(com.museosmart.exception.ConflictoException.class)
+                .hasMessageContaining("Otro administrador");
+    }
+
+    @Test
+    @DisplayName("editar de una exhibicion inexistente lanza RecursoNoEncontradoException (404)")
+    void editar_inexistente_lanza404() {
+        when(exhibicionRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> exhibicionService.editar(99L,
+                new EditarExhibicionRequest("X", "corta", null, null, null, null, null, 0), 9L))
+                .isInstanceOf(RecursoNoEncontradoException.class);
+    }
+
+    @Test
+    @DisplayName("editar ignora intentos de cambiar el codigo: el campo no se toca")
+    void editar_noCambiaCodigo() {
+        Exhibicion existente = exhibicion("pintura-historica-01");
+        existente.setVersion(0);
+        when(exhibicionRepository.findById(5L)).thenReturn(Optional.of(existente));
+        when(exhibicionRepository.save(any(Exhibicion.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(usuarioAdminRepository.findById(9L)).thenReturn(Optional.empty());
+
+        Exhibicion resultado = exhibicionService.editar(5L,
+                new EditarExhibicionRequest("Nuevo", "corta", null, null, null, null, null, 0), 9L);
+
+        assertThat(resultado.getCodigo()).isEqualTo("pintura-historica-01");
+    }
+    // ---------- Regla de imagen ----------
+
+    @Test
+    @DisplayName("activar sin imagen lanza ConflictoException (409)")
+    void cambiarEstado_activarSinImagen_409() {
+        Exhibicion inactiva = exhibicion("pintura-historica-01");
+        inactiva.setActiva(false);
+        when(exhibicionRepository.findById(5L)).thenReturn(Optional.of(inactiva));
+        when(multimediaRepository.existsByExhibicionIdAndTipo(any(), any())).thenReturn(false);
+
+        assertThatThrownBy(() -> exhibicionService.cambiarEstado(5L,
+                new CambioEstadoRequest(true, null), 9L))
+                .isInstanceOf(com.museosmart.exception.ConflictoException.class)
+                .hasMessageContaining("Sube una imagen");
+
+        verify(exhibicionRepository, never()).save(any(Exhibicion.class));
+    }
+
+    @Test
+    @DisplayName("activar con imagen funciona")
+    void cambiarEstado_activarConImagen_ok() {
+        Exhibicion inactiva = exhibicion("pintura-historica-01");
+        inactiva.setActiva(false);
+        when(exhibicionRepository.findById(5L)).thenReturn(Optional.of(inactiva));
+        when(multimediaRepository.existsByExhibicionIdAndTipo(any(), any())).thenReturn(true);
+        when(exhibicionRepository.save(any(Exhibicion.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Exhibicion resultado = exhibicionService.cambiarEstado(5L,
+                new CambioEstadoRequest(true, null), 9L);
+
+        assertThat(resultado.isActiva()).isTrue();
+    }
+
+    @Test
+    @DisplayName("desactivar sin imagen esta permitido")
+    void cambiarEstado_desactivarSinImagen_ok() {
+        Exhibicion activa = exhibicion("pintura-historica-01");
+        activa.setActiva(true);
+        when(exhibicionRepository.findById(5L)).thenReturn(Optional.of(activa));
+        when(exhibicionRepository.save(any(Exhibicion.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Exhibicion resultado = exhibicionService.cambiarEstado(5L,
+                new CambioEstadoRequest(false, "mantenimiento"), 9L);
+
+        assertThat(resultado.isActiva()).isFalse();
+    }
+
+    @Test
+    @DisplayName("eliminar imagen siempre lanza ConflictoException (409)")
+    void eliminarImagen_noPermitido() {
+        Exhibicion ex = exhibicion("pintura-historica-01");
+        when(exhibicionRepository.findById(5L)).thenReturn(Optional.of(ex));
+
+        assertThatThrownBy(() -> exhibicionService.eliminarImagenNoPermitido(5L))
+                .isInstanceOf(com.museosmart.exception.ConflictoException.class)
+                .hasMessageContaining("no se puede eliminar");
+    }
     private Exhibicion exhibicion(String codigo) {
         Exhibicion e = new Exhibicion();
         e.setCodigo(codigo);

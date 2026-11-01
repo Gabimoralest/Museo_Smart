@@ -39,3 +39,17 @@ export function listarTodasExhibicionesPublicas({ signal } = {}) {
     signal,
   })
 }
+
+/**
+ * Lista las salas reales del museo (GET /api/v1/salas). Se usa para derivar las
+ * opciones del filtro por sala en el panel, en lugar de una lista estática.
+ * @param {{signal?: AbortSignal}} [opciones]
+ * @returns {Promise<Array>} SalaResponse[]
+ */
+export function listarSalasPublicas({ signal } = {}) {
+  return solicitarJson('/salas', {
+    method: 'GET',
+    autenticado: false,
+    signal,
+  })
+}

@@ -1180,3 +1180,24 @@
   opacity: 0.65;
   cursor: not-allowed;
 }
+
+/* ============================================================
+   Modelo fijo de usuarios: la cuenta SuperAdmin es de solo lectura
+   ============================================================ */
+.admin-acciones-protegida {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.78rem;
+  font-style: italic;
+  color: #7a6a55;
+  white-space: nowrap;
+}
+
+.admin-aviso--neutral {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(198, 161, 91, 0.12);
+  color: #6a5325;
+  font-size: 0.85rem;
+}

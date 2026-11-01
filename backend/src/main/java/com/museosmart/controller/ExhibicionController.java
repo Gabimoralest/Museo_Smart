@@ -2,6 +2,8 @@ package com.museosmart.controller;
 
 import com.museosmart.dto.DtoMapper;
 import com.museosmart.dto.ExhibicionResponse;
+import com.museosmart.entity.ContenidoMultimedia;
+import com.museosmart.entity.Exhibicion;
 import com.museosmart.service.ExhibicionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -15,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1")
@@ -29,15 +32,18 @@ public class ExhibicionController {
 
     @GetMapping("/exhibiciones")
     @Operation(summary = "Listar exhibiciones activas",
-            description = "Devuelve únicamente las exhibiciones activas destinadas a la visita pública.")
+            description = "Devuelve las exhibiciones activas, incluida la exhibición especial de la plaza central.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Listado de exhibiciones activas")
     })
     public ResponseEntity<List<ExhibicionResponse>> listarActivas() {
-        List<ExhibicionResponse> exhibiciones = exhibicionService.listarActivas().stream()
-                .map(DtoMapper::toExhibicionResponse)
+        List<Exhibicion> exhibiciones = exhibicionService.listarActivas();
+        Map<Long, Map<String, ContenidoMultimedia>> multimedia =
+                exhibicionService.multimediaPorExhibicion(exhibiciones);
+        List<ExhibicionResponse> respuesta = exhibiciones.stream()
+                .map(e -> aDto(e, multimedia))
                 .toList();
-        return ResponseEntity.ok(exhibiciones);
+        return ResponseEntity.ok(respuesta);
     }
 
     @GetMapping("/exhibiciones/{id}")
@@ -50,12 +56,15 @@ public class ExhibicionController {
     public ResponseEntity<ExhibicionResponse> obtenerExhibicion(
             @Parameter(description = "Identificador de la exhibición", example = "1")
             @PathVariable Long id) {
-        return ResponseEntity.ok(DtoMapper.toExhibicionResponse(exhibicionService.obtenerActivaPorId(id)));
+        Exhibicion exhibicion = exhibicionService.obtenerActivaPorId(id);
+        Map<String, ContenidoMultimedia> mm = exhibicionService.multimediaPorTipo(id);
+        return ResponseEntity.ok(DtoMapper.toExhibicionResponse(exhibicion,
+                mm.get(ContenidoMultimedia.TIPO_IMAGEN), mm.get(ContenidoMultimedia.TIPO_VIDEO)));
     }
 
     @GetMapping("/salas/{salaId}/exhibiciones")
     @Operation(summary = "Listar exhibiciones de una sala",
-            description = "Devuelve las exhibiciones de la sala indicada o 404 si la sala no existe.")
+            description = "Devuelve las exhibiciones activas de la sala. NO incluye la exhibición especial.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Exhibiciones de la sala"),
             @ApiResponse(responseCode = "404", description = "Sala no encontrada")
@@ -63,9 +72,19 @@ public class ExhibicionController {
     public ResponseEntity<List<ExhibicionResponse>> listarPorSala(
             @Parameter(description = "Identificador de la sala", example = "1")
             @PathVariable Long salaId) {
-        List<ExhibicionResponse> exhibiciones = exhibicionService.listarPorSala(salaId).stream()
-                .map(DtoMapper::toExhibicionResponse)
+        List<Exhibicion> exhibiciones = exhibicionService.listarPorSala(salaId);
+        Map<Long, Map<String, ContenidoMultimedia>> multimedia =
+                exhibicionService.multimediaPorExhibicion(exhibiciones);
+        List<ExhibicionResponse> respuesta = exhibiciones.stream()
+                .map(e -> aDto(e, multimedia))
                 .toList();
-        return ResponseEntity.ok(exhibiciones);
+        return ResponseEntity.ok(respuesta);
+    }
+
+    private ExhibicionResponse aDto(Exhibicion exhibicion,
+                                    Map<Long, Map<String, ContenidoMultimedia>> multimedia) {
+        Map<String, ContenidoMultimedia> mm = multimedia.getOrDefault(exhibicion.getId(), Map.of());
+        return DtoMapper.toExhibicionResponse(exhibicion,
+                mm.get(ContenidoMultimedia.TIPO_IMAGEN), mm.get(ContenidoMultimedia.TIPO_VIDEO));
     }
 }

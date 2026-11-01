@@ -8,7 +8,6 @@ import {
 } from './iconos'
 import { obtenerRanking } from '../data/popularidadApi'
 import { ErrorHttp } from '../data/httpClient'
-import { imagenExhibicion } from '../data/exhibicionesData'
 import './Popularidad.css'
 
 // ------------------------------------------------------------------
@@ -22,25 +21,11 @@ import './Popularidad.css'
 // No se usan datos ficticios.
 // ------------------------------------------------------------------
 
-// La imagen no viene del backend; se reutiliza el recurso local de forma
-// estable por id, igual que en Gestión de exhibiciones.
-const IMAGENES_DISPONIBLES = [
-  '01-mascara-ceremonial.jpg',
-  '02-fosil-ammonite.jpg',
-  '03-vasija-ceramica.jpg',
-  '04-retrato-historico.jpg',
-  '05-textil-ancestral.jpg',
-  '06-orfebreria-muisca.jpg',
-  '07-escultura-litica.jpg',
-  '08-restos-oseos.jpg',
-]
-
-function imagenPara(exhibicionId) {
-  const id = Number(exhibicionId)
-  const indice = Number.isFinite(id) && id > 0 ? (id - 1) % IMAGENES_DISPONIBLES.length : 0
-  return imagenExhibicion(IMAGENES_DISPONIBLES[indice])
+// El ranking no incluye la imagen de la exhibición; se muestra un marcador
+// neutro cuando no hay recurso, sin inventar imágenes por id.
+function imagenPara() {
+  return null
 }
-
 function mensajeDeError(error, porDefecto) {
   if (error instanceof ErrorHttp) {
     if (error.tipo === 'conexion') {
@@ -303,7 +288,7 @@ export default function Popularidad() {
             return (
               <article key={item.exhibicionId} className="pop-ranking-fila">
                 <span className="pop-ranking-puesto">#{posicion}</span>
-                <img src={item.imagen} alt={item.titulo} className="pop-ranking-thumb" />
+                {item.imagen ? (<img src={item.imagen} alt={item.titulo} className="pop-ranking-thumb" />) : (<span className="pop-ranking-thumb pop-ranking-thumb--vacia" aria-hidden="true" />)}
 
                 <div className="pop-ranking-info">
                   <h3 className="pop-ranking-nombre">{item.titulo}</h3>

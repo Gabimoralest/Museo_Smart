@@ -4,58 +4,36 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
 
+/**
+ * Exhibicion en el catalogo publico (solo activas).
+ *
+ * <p>Incluye la categoria derivada y la marca {@code especial} para la estatua
+ * central. La sala puede ser {@code null} en la exhibicion especial.</p>
+ */
 @Schema(description = "Exhibición del museo")
 public record ExhibicionResponse(
 
-        @Schema(description = "Identificador de la exhibición", example = "1")
         Long id,
-
-        @Schema(description = "Identificador de la sala a la que pertenece", example = "1")
         Long salaId,
-
-        @Schema(description = "Nombre de la sala a la que pertenece", example = "Pintura histórica")
         String salaNombre,
-
-        @Schema(description = "Código estable de la exhibición", example = "pintura-historica-01")
         String codigo,
-
-        @Schema(description = "Título de la exhibición")
+        String ubicacion3dCodigo,
         String titulo,
-
-        @Schema(description = "Descripción de la exhibición")
+        String descripcionCorta,
         String descripcion,
-
-        @Schema(description = "Contexto histórico de la exhibición")
-        String contextoHistorico,
-
-        @Schema(description = "Autor o cultura")
         String autorCultura,
-
-        @Schema(description = "Período")
         String periodo,
-
-        @Schema(description = "Material")
         String material,
-
-        @Schema(description = "Fecha aproximada de creación (texto libre)")
-        String fechaCreacionAprox,
-
-        @Schema(description = "Límite inferior de temperatura en °C")
+        String datoCurioso,
+        String categoria,
+        boolean especial,
         BigDecimal tempMinC,
-
-        @Schema(description = "Límite superior de temperatura en °C")
         BigDecimal tempMaxC,
-
-        @Schema(description = "Límite inferior de humedad en %")
         BigDecimal humedadMinPct,
-
-        @Schema(description = "Límite superior de humedad en %")
         BigDecimal humedadMaxPct,
-
-        @Schema(description = "Límite máximo de luz en lux")
         BigDecimal luzMaxLux,
-
-        @Schema(description = "Indica si la exhibición está activa", example = "true")
-        boolean activa
+        boolean activa,
+        String imagenUrl,
+        String videoUrl
 ) {
 }

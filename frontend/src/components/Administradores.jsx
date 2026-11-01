@@ -68,7 +68,6 @@ function mapearUsuario(dto) {
     esSuperAdmin: dto.rol === 'SUPERADMIN',
     correo: dto.correo ?? '',
     rol: etiquetaRol(dto.rol),
-    rolBackend: dto.rol ?? '',
     estado: etiquetaEstado(dto.estado),
     estadoBackend: dto.estado ?? '',
     primerInicioSesion: Boolean(dto.primerInicioSesion),
@@ -160,7 +159,6 @@ export default function Administradores({ sesion: _sesion }) {
   const [formNombre, setFormNombre] = useState('')
   const [formCorreo, setFormCorreo] = useState('')
   const [formContrasena, setFormContrasena] = useState('')
-  const [formRol, setFormRol] = useState('Administrador')
 
   // Estado del envío de creación.
   const [creando, setCreando] = useState(false)
@@ -314,10 +312,9 @@ export default function Administradores({ sesion: _sesion }) {
 
   const abrirEditar = (adm) => {
     const objetivo = adm || adminSeleccionado
-    if (!objetivo) return
+    if (!objetivo || objetivo.esSuperAdmin) return
     setFormNombre(objetivo.nombre)
     setFormCorreo(objetivo.correo)
-    setFormRol(objetivo.rol)
     setErrorEditar(null)
     setAdminSeleccionadoId(objetivo.id)
     setModalEditar(true)
@@ -345,7 +342,6 @@ export default function Administradores({ sesion: _sesion }) {
       const actualizado = await actualizarUsuario(adminSeleccionado.id, {
         nombre: formNombre.trim(),
         correo: formCorreo.trim(),
-        rolBackend: adminSeleccionado.rolBackend,
       })
       setModalEditar(false)
       setAvisoExito(`Administrador «${actualizado?.nombre || formNombre.trim()}» actualizado correctamente.`)
@@ -361,21 +357,8 @@ export default function Administradores({ sesion: _sesion }) {
   // Activa o desactiva una cuenta (según su estado actual).
   const cambiarEstado = async (adm) => {
     if (!adm || operandoRef.current || estadosEnCurso.has(adm.id)) return
-    if (adm.esSuperAdmin && adm.estadoBackend === 'ACTIVO') {
-      // El backend protege al último SUPERADMIN activo; se evita la llamada
-      // solo si es el único SuperAdmin activo.
-      const superActivos = admins.filter(
-        (a) => a.esSuperAdmin && a.estadoBackend === 'ACTIVO',
-      ).length
-      if (superActivos <= 1) {
-        setAvisoExito(null)
-        setErrorCarga(
-          'No se puede desactivar al último SuperAdmin activo.',
-        )
-        setTimeout(() => setErrorCarga(null), 4000)
-        return
-      }
-    }
+    // La cuenta SuperAdmin no se modifica desde el panel.
+    if (adm.esSuperAdmin) return
 
     const nuevoEstado = adm.estadoBackend === 'ACTIVO' ? 'INACTIVO' : 'ACTIVO'
     operandoRef.current = true
@@ -406,6 +389,7 @@ export default function Administradores({ sesion: _sesion }) {
   }
 
   const abrirEliminar = (adm) => {
+    if (!adm || adm.esSuperAdmin) return
     setAdminSeleccionadoId(adm.id)
     setErrorEliminar(null)
     setModalEliminar(true)
@@ -637,38 +621,43 @@ export default function Administradores({ sesion: _sesion }) {
                       </td>
                       <td>{item.fechaCreacion}</td>
                       <td>
-                        <div className="admin-acciones-wrap" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            type="button"
-                            className="btn-accion-admin"
-                            title={item.estadoBackend === 'ACTIVO' ? 'Desactivar cuenta' : 'Activar cuenta'}
-                            aria-label={`${item.estadoBackend === 'ACTIVO' ? 'Desactivar' : 'Activar'} ${item.nombre}`}
-                            aria-busy={estadosEnCurso.has(item.id)}
-                            disabled={estadosEnCurso.has(item.id)}
-                            onClick={() => cambiarEstado(item)}
-                          >
-                            {item.estadoBackend === 'ACTIVO' ? <IconoBloqueo /> : <IconoCheck />}
-                          </button>
-                          <button
-                            type="button"
-                            className="btn-accion-admin"
-                            title="Editar administrador"
-                            aria-label={`Editar ${item.nombre}`}
-                            onClick={() => abrirEditar(item)}
-                          >
-                            <IconoEditar />
-                          </button>
-                          <button
-                            type="button"
-                            className="btn-accion-admin btn-accion-admin--eliminar"
-                            title={item.esSuperAdmin ? 'No se puede eliminar la cuenta SuperAdmin' : 'Eliminar administrador'}
-                            aria-label={`Eliminar ${item.nombre}`}
-                            disabled={item.esSuperAdmin}
-                            onClick={() => abrirEliminar(item)}
-                          >
-                            <IconoBasura />
-                          </button>
-                        </div>
+                        {item.esSuperAdmin ? (
+                          <span className="admin-acciones-protegida" title="La cuenta de SuperAdmin no se modifica desde el panel">
+                            Cuenta protegida
+                          </span>
+                        ) : (
+                          <div className="admin-acciones-wrap" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              type="button"
+                              className="btn-accion-admin"
+                              title={item.estadoBackend === 'ACTIVO' ? 'Desactivar cuenta' : 'Activar cuenta'}
+                              aria-label={`${item.estadoBackend === 'ACTIVO' ? 'Desactivar' : 'Activar'} ${item.nombre}`}
+                              aria-busy={estadosEnCurso.has(item.id)}
+                              disabled={estadosEnCurso.has(item.id)}
+                              onClick={() => cambiarEstado(item)}
+                            >
+                              {item.estadoBackend === 'ACTIVO' ? <IconoBloqueo /> : <IconoCheck />}
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-accion-admin"
+                              title="Editar administrador"
+                              aria-label={`Editar ${item.nombre}`}
+                              onClick={() => abrirEditar(item)}
+                            >
+                              <IconoEditar />
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-accion-admin btn-accion-admin--eliminar"
+                              title="Eliminar administrador"
+                              aria-label={`Eliminar ${item.nombre}`}
+                              onClick={() => abrirEliminar(item)}
+                            >
+                              <IconoBasura />
+                            </button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   )
@@ -784,14 +773,20 @@ export default function Administradores({ sesion: _sesion }) {
             </div>
 
             <div className="admin-detalle__footer">
-              <button
-                type="button"
-                className="btn-editar-admin-panel"
-                onClick={() => abrirEditar(adminSeleccionado)}
-              >
-                <IconoEditar />
-                <span>Editar administrador</span>
-              </button>
+              {adminSeleccionado.esSuperAdmin ? (
+                <p className="admin-aviso admin-aviso--neutral" role="note">
+                  La cuenta de SuperAdmin no se modifica desde el panel.
+                </p>
+              ) : (
+                <button
+                  type="button"
+                  className="btn-editar-admin-panel"
+                  onClick={() => abrirEditar(adminSeleccionado)}
+                >
+                  <IconoEditar />
+                  <span>Editar administrador</span>
+                </button>
+              )}
             </div>
           </aside>
         )}
@@ -920,14 +915,12 @@ export default function Administradores({ sesion: _sesion }) {
                 />
               </div>
 
-              <div className="admin-campos-fila">
-                <div className="admin-campo">
-                  <label>Rol</label>
-                  <select value={formRol} disabled title="El rol de una cuenta no se modifica">
-                    <option value="Administrador">Administrador</option>
-                    <option value="SuperAdmin">SuperAdmin</option>
-                  </select>
-                </div>
+              <div className="admin-campo">
+                <label>Rol</label>
+                <input type="text" value="Administrador" readOnly disabled />
+                <span className="admin-campo__ayuda">
+                  Todas las cuentas del panel son Administrador. El rol no se modifica.
+                </span>
               </div>
 
               {errorEditar && (

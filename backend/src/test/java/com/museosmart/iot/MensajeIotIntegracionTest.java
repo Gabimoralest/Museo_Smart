@@ -223,7 +223,7 @@ class MensajeIotIntegracionTest {
 
     private long totalSala(Long salaId) {
         return visitaRepository.findRankingCompleto().stream()
-                .filter(r -> r.getSalaId().equals(salaId))
+                .filter(r -> java.util.Objects.equals(r.getSalaId(), salaId))
                 .mapToLong(RankingExhibicionView::getTotalVisitasValidas)
                 .sum();
     }

@@ -25,8 +25,7 @@ export default function PaginaRecorrido({ onVolver, onIngresar }) {
             <h1 className="pagina-recorrido__titulo">Recorrido virtual</h1>
             <p className="pagina-recorrido__texto">
               Recorre el museo en primera persona, observa cada pieza y
-              selecciónala. En esta fase el recorrido es una visita libre:
-              todavía no guarda datos.
+              selecciónala para conocer su ficha.
             </p>
           </header>
 

@@ -24,6 +24,7 @@ import MonitoreoIoT from './MonitoreoIoT'
 import Alertas from './Alertas'
 import Popularidad from './Popularidad'
 import Administradores from './Administradores'
+import PaginaEdicionExhibicion from './PaginaEdicionExhibicion'
 import MiPerfil from './MiPerfil'
 
 import './PanelAdmin.css'
@@ -53,6 +54,8 @@ const navegar = (ruta) => {
 const leerSeccionDeHash = () => {
   const hash = window.location.hash
   if (hash === '#/admin' || hash === '#/admin/inicio') return 'inicio'
+  // Página de edición: #/admin/exhibiciones/{id}/editar
+  if (/^#\/admin\/exhibiciones\/\d+\/editar$/.test(hash)) return 'editar-exhibicion'
   if (hash === '#/admin/exhibiciones' || hash === '#gestion-exhibiciones') return 'exhibiciones'
   if (hash === '#/admin/monitoreo') return 'monitoreo'
   if (hash === '#/admin/alertas') return 'alertas'
@@ -60,6 +63,12 @@ const leerSeccionDeHash = () => {
   if (hash === '#/admin/administradores') return 'administradores'
   if (hash === '#/admin/perfil') return 'perfil'
   return 'inicio'
+}
+
+/** Extrae el id de la ruta de edición, o null. */
+const idDeEdicion = () => {
+  const m = /^#\/admin\/exhibiciones\/(\d+)\/editar$/.exec(window.location.hash)
+  return m ? Number(m[1]) : null
 }
 
 export default function PanelAdmin({ sesion, onCerrarSesion, onVolverAlMuseo }) {
@@ -323,6 +332,14 @@ export default function PanelAdmin({ sesion, onCerrarSesion, onVolverAlMuseo }) 
             <GestionExhibiciones
               busqueda={busquedaTopbar}
               onCambiarBusqueda={setBusquedaTopbar}
+            />
+          )}
+
+          {seccionActual === 'editar-exhibicion' && (
+            <PaginaEdicionExhibicion
+              key={idDeEdicion()}
+              exhibicionId={idDeEdicion()}
+              onVolver={() => navegar('#/admin/exhibiciones')}
             />
           )}
 

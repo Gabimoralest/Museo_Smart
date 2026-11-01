@@ -68,47 +68,56 @@ public class UsuarioAdminController {
 
     @PostMapping
     @Operation(summary = "Crear administrador",
-            description = "Crea una cuenta. La contraseña es obligatoria y se almacena con hash.")
+            description = "Crea una cuenta ADMIN. El rol no es asignable: las cuentas del panel son "
+                    + "siempre ADMIN. La contraseña es obligatoria y se almacena con hash.")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Administrador creado"),
-            @ApiResponse(responseCode = "400", description = "Solicitud inválida"),
+            @ApiResponse(responseCode = "400", description = "Solicitud inválida o intento de asignar otro rol"),
             @ApiResponse(responseCode = "401", description = "No autenticado"),
             @ApiResponse(responseCode = "403", description = "Sin permisos o cambio de contraseña pendiente"),
             @ApiResponse(responseCode = "409", description = "Correo ya registrado")
     })
     public ResponseEntity<UsuarioAdminResponse> crear(
             @Validated(UsuarioAdminRequest.OnCreate.class) @RequestBody UsuarioAdminRequest request) {
+        // El rol no se persiste: se rechaza cualquier valor distinto de ADMIN y,
+        // en cualquier caso, la cuenta se crea como ADMIN.
+        usuarioAdminService.validarRolNoEscalable(request.rol());
         var creado = usuarioAdminService.crear(
-                request.nombre(), request.correo(), request.rol(), request.contrasena());
+                request.nombre(), request.correo(), request.contrasena());
         return ResponseEntity.status(HttpStatus.CREATED).body(DtoMapper.toUsuarioAdminResponse(creado));
     }
 
     @PutMapping("/{id}")
     @Operation(summary = "Actualizar administrador",
-            description = "Actualiza nombre y correo. No modifica contraseña ni rol.")
+            description = "Actualiza nombre y correo de una cuenta ADMIN. No modifica contraseña ni rol. "
+                    + "La cuenta de SuperAdmin no se puede modificar desde el panel.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Administrador actualizado"),
             @ApiResponse(responseCode = "400", description = "Solicitud inválida"),
             @ApiResponse(responseCode = "401", description = "No autenticado"),
-            @ApiResponse(responseCode = "403", description = "Sin permisos o cambio de contraseña pendiente"),
+            @ApiResponse(responseCode = "403", description = "Sin permisos, cambio de contraseña pendiente "
+                    + "o cuenta SuperAdmin protegida"),
             @ApiResponse(responseCode = "404", description = "Administrador no encontrado"),
             @ApiResponse(responseCode = "409", description = "Correo ya registrado")
     })
     public ResponseEntity<UsuarioAdminResponse> actualizar(
             @PathVariable Long id,
             @Validated(UsuarioAdminRequest.OnUpdate.class) @RequestBody UsuarioAdminRequest request) {
+        usuarioAdminService.validarRolNoEscalable(request.rol());
         var actualizado = usuarioAdminService.actualizar(id, request.nombre(), request.correo());
         return ResponseEntity.ok(DtoMapper.toUsuarioAdminResponse(actualizado));
     }
 
     @PatchMapping("/{id}/estado")
     @Operation(summary = "Cambiar estado de un administrador",
-            description = "Cambia el estado de la cuenta. Protege la última cuenta SuperAdmin activa.")
+            description = "Activa o desactiva una cuenta ADMIN. La cuenta de SuperAdmin no se puede "
+                    + "desactivar desde el panel.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Estado actualizado"),
             @ApiResponse(responseCode = "400", description = "Solicitud inválida"),
             @ApiResponse(responseCode = "401", description = "No autenticado"),
-            @ApiResponse(responseCode = "403", description = "Sin permisos o cambio de contraseña pendiente"),
+            @ApiResponse(responseCode = "403", description = "Sin permisos, cambio de contraseña pendiente "
+                    + "o cuenta SuperAdmin protegida"),
             @ApiResponse(responseCode = "404", description = "Administrador no encontrado")
     })
     public ResponseEntity<UsuarioAdminResponse> cambiarEstado(
@@ -120,12 +129,13 @@ public class UsuarioAdminController {
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Eliminar administrador",
-            description = "Elimina una cuenta. Protege la última cuenta SuperAdmin activa.")
+            description = "Elimina una cuenta ADMIN. La cuenta de SuperAdmin no se puede eliminar.")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Administrador eliminado"),
             @ApiResponse(responseCode = "400", description = "Operación no permitida por reglas de negocio"),
             @ApiResponse(responseCode = "401", description = "No autenticado"),
-            @ApiResponse(responseCode = "403", description = "Sin permisos o cambio de contraseña pendiente"),
+            @ApiResponse(responseCode = "403", description = "Sin permisos, cambio de contraseña pendiente "
+                    + "o cuenta SuperAdmin protegida"),
             @ApiResponse(responseCode = "404", description = "Administrador no encontrado")
     })
     public ResponseEntity<Void> eliminar(@PathVariable Long id) {

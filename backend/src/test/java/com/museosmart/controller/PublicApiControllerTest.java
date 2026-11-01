@@ -60,7 +60,8 @@ class PublicApiControllerTest {
                 .andExpect(jsonPath("$.length()").value(2))
                 .andExpect(jsonPath("$[0].id").value(1))
                 .andExpect(jsonPath("$[0].nombre").value("Pintura histórica"))
-                .andExpect(jsonPath("$[0].orden").value(1));
+                .andExpect(jsonPath("$[0].orden").value(1))
+                .andExpect(jsonPath("$[0].codigo3d").value("SALA_1"));
     }
 
     @Test
@@ -108,6 +109,7 @@ class PublicApiControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].codigo").value("pintura-historica-01"))
+                .andExpect(jsonPath("$[0].ubicacion3dCodigo").value("EXH_S1_01"))
                 .andExpect(jsonPath("$[0].activa").value(true))
                 .andExpect(jsonPath("$[0].salaId").value(1))
                 .andExpect(jsonPath("$[0].salaNombre").value("Pintura histórica"));
@@ -165,6 +167,7 @@ class PublicApiControllerTest {
         s.setNombre(nombre);
         s.setEstado("activa");
         s.setOrden(orden);
+        s.setCodigo3d("SALA_" + orden);
         return s;
     }
 
@@ -174,10 +177,20 @@ class PublicApiControllerTest {
         setField(e, "id", id);
         e.setSala(sala);
         e.setCodigo(codigo);
+        setField(e, "ubicacion3d", ubicacion3d("EXH_S1_01", sala));
         e.setTitulo("[PROVISIONAL] " + codigo);
         e.setActiva(activa);
         e.setTempMinC(new BigDecimal("18.00"));
         return e;
+    }
+
+    private com.museosmart.entity.Ubicacion3d ubicacion3d(String codigo, Sala sala) {
+        com.museosmart.entity.Ubicacion3d u = new com.museosmart.entity.Ubicacion3d();
+        setField(u, "id", 1L);
+        setField(u, "codigo", codigo);
+        setField(u, "sala", sala);
+        setField(u, "estado", "OCUPADA");
+        return u;
     }
 
     private void setField(Object target, String campo, Object valor) {

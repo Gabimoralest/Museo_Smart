@@ -35,7 +35,7 @@ class UsuarioAdminDtoTest {
     }
 
     private UsuarioAdminRequest requestValido() {
-        return new UsuarioAdminRequest("Gabs", "admin@museo.com", "ADMIN", "Secreta123");
+        return new UsuarioAdminRequest("Gabs", "admin@museo.com", "Secreta123", null);
     }
 
     // ---------- Validación al crear ----------
@@ -52,7 +52,7 @@ class UsuarioAdminDtoTest {
     @Test
     @DisplayName("al crear, el nombre es obligatorio")
     void crear_nombreObligatorio() {
-        UsuarioAdminRequest req = new UsuarioAdminRequest("  ", "a@museo.com", "ADMIN", "Secreta123");
+        UsuarioAdminRequest req = new UsuarioAdminRequest("  ", "a@museo.com", "Secreta123", null);
 
         Set<ConstraintViolation<UsuarioAdminRequest>> violaciones =
                 validator.validate(req, UsuarioAdminRequest.OnCreate.class);
@@ -63,7 +63,7 @@ class UsuarioAdminDtoTest {
     @Test
     @DisplayName("al crear, el correo es obligatorio")
     void crear_correoObligatorio() {
-        UsuarioAdminRequest req = new UsuarioAdminRequest("Gabs", "", "ADMIN", "Secreta123");
+        UsuarioAdminRequest req = new UsuarioAdminRequest("Gabs", "", "Secreta123", null);
 
         Set<ConstraintViolation<UsuarioAdminRequest>> violaciones =
                 validator.validate(req, UsuarioAdminRequest.OnCreate.class);
@@ -74,7 +74,7 @@ class UsuarioAdminDtoTest {
     @Test
     @DisplayName("al crear, un correo con formato inválido es rechazado")
     void crear_correoInvalido() {
-        UsuarioAdminRequest req = new UsuarioAdminRequest("Gabs", "no-es-un-correo", "ADMIN", "Secreta123");
+        UsuarioAdminRequest req = new UsuarioAdminRequest("Gabs", "no-es-un-correo", "Secreta123", null);
 
         Set<ConstraintViolation<UsuarioAdminRequest>> violaciones =
                 validator.validate(req, UsuarioAdminRequest.OnCreate.class);
@@ -86,7 +86,7 @@ class UsuarioAdminDtoTest {
     @DisplayName("al crear, un nombre mayor a 120 caracteres es rechazado")
     void crear_nombreDemasiadoLargo() {
         String largo = "x".repeat(121);
-        UsuarioAdminRequest req = new UsuarioAdminRequest(largo, "a@museo.com", "ADMIN", "Secreta123");
+        UsuarioAdminRequest req = new UsuarioAdminRequest(largo, "a@museo.com", "Secreta123", null);
 
         Set<ConstraintViolation<UsuarioAdminRequest>> violaciones =
                 validator.validate(req, UsuarioAdminRequest.OnCreate.class);
@@ -97,7 +97,7 @@ class UsuarioAdminDtoTest {
     @Test
     @DisplayName("al crear, una contraseña de menos de 8 caracteres es rechazada")
     void crear_contrasenaCorta() {
-        UsuarioAdminRequest req = new UsuarioAdminRequest("Gabs", "a@museo.com", "ADMIN", "corta12");
+        UsuarioAdminRequest req = new UsuarioAdminRequest("Gabs", "a@museo.com", "corta12", null);
 
         Set<ConstraintViolation<UsuarioAdminRequest>> violaciones =
                 validator.validate(req, UsuarioAdminRequest.OnCreate.class);
@@ -108,7 +108,7 @@ class UsuarioAdminDtoTest {
     @Test
     @DisplayName("al crear, la contraseña es obligatoria")
     void crear_contrasenaObligatoria() {
-        UsuarioAdminRequest req = new UsuarioAdminRequest("Gabs", "a@museo.com", "ADMIN", null);
+        UsuarioAdminRequest req = new UsuarioAdminRequest("Gabs", "a@museo.com", null, null);
 
         Set<ConstraintViolation<UsuarioAdminRequest>> violaciones =
                 validator.validate(req, UsuarioAdminRequest.OnCreate.class);
@@ -117,22 +117,21 @@ class UsuarioAdminDtoTest {
     }
 
     @Test
-    @DisplayName("al crear, un rol inválido es rechazado")
-    void crear_rolInvalido() {
-        UsuarioAdminRequest req = new UsuarioAdminRequest("Gabs", "a@museo.com", "GUIA", "Secreta123");
+    @DisplayName("el rol ya no es obligatorio ni se valida en el DTO (lo controla el servicio)")
+    void crear_rolNoValidadoEnDto() {
+        UsuarioAdminRequest sinRol = new UsuarioAdminRequest("Gabs", "a@museo.com", "Secreta123", null);
 
         Set<ConstraintViolation<UsuarioAdminRequest>> violaciones =
-                validator.validate(req, UsuarioAdminRequest.OnCreate.class);
+                validator.validate(sinRol, UsuarioAdminRequest.OnCreate.class);
 
-        assertThat(violaciones).anyMatch(v -> v.getPropertyPath().toString().equals("rol"));
+        assertThat(violaciones).isEmpty();
     }
-
     // ---------- Validación al actualizar ----------
 
     @Test
     @DisplayName("al actualizar, no se exige contraseña")
     void actualizar_sinContrasena() {
-        UsuarioAdminRequest req = new UsuarioAdminRequest("Gabs", "a@museo.com", "ADMIN", null);
+        UsuarioAdminRequest req = new UsuarioAdminRequest("Gabs", "a@museo.com", null, null);
 
         Set<ConstraintViolation<UsuarioAdminRequest>> violaciones =
                 validator.validate(req, UsuarioAdminRequest.OnUpdate.class);
@@ -143,7 +142,7 @@ class UsuarioAdminDtoTest {
     @Test
     @DisplayName("al actualizar, el nombre y el correo siguen siendo obligatorios")
     void actualizar_camposObligatorios() {
-        UsuarioAdminRequest req = new UsuarioAdminRequest("", "mal-correo", "ADMIN", null);
+        UsuarioAdminRequest req = new UsuarioAdminRequest("", "mal-correo", null, null);
 
         Set<ConstraintViolation<UsuarioAdminRequest>> violaciones =
                 validator.validate(req, UsuarioAdminRequest.OnUpdate.class);

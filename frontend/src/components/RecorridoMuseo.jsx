@@ -14,11 +14,10 @@ import { Box3, Euler, Vector3 } from 'three'
 import {
   ALTURA_OJO,
   APARICION,
+  CLAVE_EXHIBICION_ID,
   COLOR_RESALTE,
-  EXHIBICION_POR_NODO,
   LIMITES,
   MODELO_URL,
-  PIEZAS,
   RADIO_JUGADOR,
   SENSIBILIDAD,
   VELOCIDAD,
@@ -26,6 +25,8 @@ import {
 } from '../data/museo3d'
 import { listarTodasExhibicionesPublicas } from '../data/exhibicionesPublicasApi'
 import { registrarVisita, FUENTE_CURSOR } from '../data/popularidadPublicaApi'
+import { urlMedia } from '../data/exhibicionesApi'
+import { primeraVista, verMas, valorReal, exhibicionMostrable } from '../data/fichaExhibicion'
 import { obtenerSesionAnonima } from '../data/sesionAnonima'
 import './RecorridoMuseo.css'
 
@@ -96,9 +97,30 @@ function aplicarResalte(malla, encendido) {
   }
 }
 
-// Contenido interno del <Canvas>: carga el modelo, prepara piezas y colisiones,
-// gobierna la cámara en primera persona y realiza la selección.
-function EscenaMuseo({ activo, alSeleccionar, alCambiarCandidata, piezaSeleccionada }) {
+// Sube por la jerarquía desde una malla hasta el nodo que lleva el id de la
+// exhibición (extras glTF -> userData). Devuelve null si no hay ninguno.
+function idExhibicionDeAncestro(objeto) {
+  for (let actual = objeto; actual; actual = actual.parent) {
+    const id = actual.userData?.[CLAVE_EXHIBICION_ID]
+    if (typeof id === 'string' && id.trim()) return id.trim()
+  }
+  return null
+}
+
+function aplicarResalteAncla(ancla, encendido) {
+  for (const malla of ancla.mallas) aplicarResalte(malla, encendido)
+}
+
+// Contenido interno del <Canvas>: carga el modelo, indexa las exhibiciones
+// etiquetadas en el GLB, prepara colisiones, gobierna la cámara en primera
+// persona y realiza la selección.
+function EscenaMuseo({
+  activo,
+  alSeleccionar,
+  alCambiarCandidata,
+  piezaSeleccionada,
+  exhibicionesPorUbicacion,
+}) {
   const { scene } = useGLTF(MODELO_URL)
   const { gl, camera, raycaster } = useThree()
 
@@ -106,7 +128,13 @@ function EscenaMuseo({ activo, alSeleccionar, alCambiarCandidata, piezaSeleccion
   const clon = useMemo(() => scene.clone(true), [scene])
   const inicializadoRef = useRef(false)
   const colisionesRef = useRef([])
-  const piezasRef = useRef([])
+  const anclasRef = useRef([])
+  const anclasMapaRef = useRef(new Map())
+  // Ubicaciones clicables = las que tienen una exhibición activa en la API.
+  const clickeables = useMemo(
+    () => (exhibicionesPorUbicacion ? new Set(exhibicionesPorUbicacion.keys()) : new Set()),
+    [exhibicionesPorUbicacion],
+  )
   const resaltadoRef = useRef(null)
   const seleccionadoRef = useRef(null)
 
@@ -118,10 +146,14 @@ function EscenaMuseo({ activo, alSeleccionar, alCambiarCandidata, piezaSeleccion
   const lateralRef = useRef(new Vector3())
   const impactoRef = useRef(new Vector3())
 
-  // Preparación del modelo: distingue piezas (por nombre real del nodo) de la
-  // arquitectura (que genera colisiones). No altera el GLB original: trabaja
-  // sobre un clon en memoria que comparte geometría con el original (three no
-  // duplica geometría en Object3D.clone), así que no hay copias masivas.
+  // Preparación del modelo:
+  //   1. Construye un índice ubicacionId -> ancla recorriendo la escena y
+  //      leyendo `userData.exhibicion_id` (extras del GLB). Nada de nombres de
+  //      nodo en duro.
+  //   2. Genera colisiones para la arquitectura (por prefijo de nombre).
+  //
+  // No altera el GLB original: trabaja sobre un clon en memoria que comparte
+  // geometría con el original (three no duplica geometría en Object3D.clone).
   //
   // Para el apuntado NO se recorren los ~900.000 triángulos del modelo en cada
   // frame; basta con la caja envolvente de cada pieza, que es una operación
@@ -132,43 +164,61 @@ function EscenaMuseo({ activo, alSeleccionar, alCambiarCandidata, piezaSeleccion
     grupo.updateWorldMatrix(true, true)
 
     const colisiones = []
-    const piezas = []
+    const anclas = new Map()
     // La anisotropía mejora la nitidez de texturas vistas en ángulo rasante
     // (suelo, paredes, cuadros) sin reemplazar el GLB. Se limita al máximo que
     // admite la GPU para no costar más de lo necesario.
     const maxAnisotropia = gl.capabilities?.getMaxAnisotropy?.() || 1
     const anisotropia = Math.min(8, maxAnisotropia)
 
-    clon.traverse((objeto) => {
-      if (!objeto.isMesh) return
-      const nombre = objeto.name
+    const aplicarCalidad = (material) => {
+      if (!material) return
+      for (const clave of Object.keys(material)) {
+        const valor = material[clave]
+        if (valor && valor.isTexture && valor.anisotropy !== anisotropia) {
+          valor.anisotropy = anisotropia
+          valor.needsUpdate = true
+        }
+      }
+    }
 
-      const aplicarCalidad = (material) => {
-        if (!material) return
-        for (const clave of Object.keys(material)) {
-          const valor = material[clave]
-          if (valor && valor.isTexture && valor.anisotropy !== anisotropia) {
-            valor.anisotropy = anisotropia
-            valor.needsUpdate = true
-          }
+    clon.traverse((objeto) => {
+      // Nodo vacío de exhibición: ancla del contrato del modelo.
+      const idExhibicion = objeto.userData?.[CLAVE_EXHIBICION_ID]
+      if (typeof idExhibicion === 'string' && idExhibicion.trim()) {
+        const ubicacionId = idExhibicion.trim()
+        const existente = anclas.get(ubicacionId)
+        if (existente) {
+          // Duplicado: se conserva el primero y se anota para el resumen.
+          existente.duplicado = true
+        } else {
+          anclas.set(ubicacionId, { ubicacionId, nodo: objeto, mallas: [], duplicado: false })
         }
       }
 
-      if (PIEZAS[nombre]) {
-        objeto.material = Array.isArray(objeto.material)
-          ? objeto.material.map((m) => m.clone())
-          : objeto.material.clone()
-        for (const material of materialesDe(objeto)) {
-          if (!material) continue
-          material.userData.emisionBase = material.emissive
-            ? material.emissive.clone()
-            : null
-          material.userData.intensidadBase = material.emissiveIntensity ?? 1
-          aplicarCalidad(material)
+      if (!objeto.isMesh) return
+      const nombre = objeto.name
+
+      // Asocia la malla con su ancla de exhibición (subiendo por .parent).
+      // Esto permite resaltar todas las mallas de una pieza conectada.
+      const idAncestro = idExhibicionDeAncestro(objeto)
+      if (idAncestro) {
+        const ancla = anclas.get(idAncestro)
+        if (ancla) {
+          objeto.material = Array.isArray(objeto.material)
+            ? objeto.material.map((m) => m.clone())
+            : objeto.material.clone()
+          for (const material of materialesDe(objeto)) {
+            if (!material) continue
+            material.userData.emisionBase = material.emissive
+              ? material.emissive.clone()
+              : null
+            material.userData.intensidadBase = material.emissiveIntensity ?? 1
+            aplicarCalidad(material)
+          }
+          ancla.mallas.push(objeto)
+          return
         }
-        objeto.userData.pieza = PIEZAS[nombre]
-        piezas.push({ nombre, malla: objeto, caja: new Box3().setFromObject(objeto) })
-        return
       }
 
       for (const material of materialesDe(objeto)) aplicarCalidad(material)
@@ -178,16 +228,49 @@ function EscenaMuseo({ activo, alSeleccionar, alCambiarCandidata, piezaSeleccion
       }
     })
 
+    // Caja envolvente por ancla (para el apuntado barato y el clic por caja).
+    const listaAnclas = []
+    for (const ancla of anclas.values()) {
+      if (ancla.mallas.length === 0) continue
+      const caja = new Box3()
+      for (const malla of ancla.mallas) caja.union(new Box3().setFromObject(malla))
+      listaAnclas.push({ ubicacionId: ancla.ubicacionId, mallas: ancla.mallas, caja, duplicado: ancla.duplicado })
+    }
+
     colisionesRef.current = colisiones
-    piezasRef.current = piezas
+    anclasRef.current = listaAnclas
+    anclasMapaRef.current = anclas
   }, [clon, gl])
+
+  // Resumen de desarrollo: cruza los IDs etiquetados en el modelo con el
+  // catálogo de la API. Se recalcula cuando cualquiera de los dos está listo
+  // (el modelo puede cargar antes o después de la respuesta del backend).
+  useEffect(() => {
+    if (!import.meta.env.DEV || !exhibicionesPorUbicacion) return
+    const anclas = anclasMapaRef.current
+    if (!anclas || anclas.size === 0) return
+    const idsModelo = [...anclas.keys()]
+    const activas = [...exhibicionesPorUbicacion.values()]
+    const sinExhibicion = idsModelo.filter((id) => !exhibicionesPorUbicacion.has(id))
+    const sinNodo = activas
+      .map((ex) => ex.ubicacion3dCodigo)
+      .filter((id) => id && !anclas.has(id))
+    const duplicados = [...anclas.values()].filter((a) => a.duplicado).map((a) => a.ubicacionId)
+    console.info('[recorrido 3D] resumen modelo/API', {
+      idsModelo: idsModelo.length,
+      exhibicionesActivas: activas.length,
+      idsDelModeloSinExhibicion: sinExhibicion,
+      exhibicionesActivasSinNodoEnModelo: sinNodo,
+      idsDuplicados: duplicados,
+    })
+  }, [exhibicionesPorUbicacion, clon])
 
   // Mantiene el resalte en sincronía con la pieza seleccionada en el padre: si
   // se deselecciona (por ejemplo, al reiniciar el recorrido), se apaga.
   useEffect(() => {
     if (piezaSeleccionada) return
     if (seleccionadoRef.current) {
-      aplicarResalte(seleccionadoRef.current.malla, false)
+      aplicarResalteAncla(seleccionadoRef.current, false)
       seleccionadoRef.current = null
     }
   }, [piezaSeleccionada])
@@ -272,7 +355,7 @@ function EscenaMuseo({ activo, alSeleccionar, alCambiarCandidata, piezaSeleccion
       if (!candidato) return
 
       raycaster.setFromCamera({ x: 0, y: 0 }, camera)
-      const preciso = raycaster.intersectObject(candidato.malla, false)
+      const preciso = raycaster.intersectObjects(candidato.mallas, false)
 
       // Si el clic coincide con la caja pero no toca la malla, se conserva la
       // selección por caja para no frustrar al visitante.
@@ -280,14 +363,12 @@ function EscenaMuseo({ activo, alSeleccionar, alCambiarCandidata, piezaSeleccion
         return
       }
 
-      if (seleccionadoRef.current && seleccionadoRef.current.malla !== candidato.malla) {
-        aplicarResalte(seleccionadoRef.current.malla, false)
+      if (seleccionadoRef.current && seleccionadoRef.current !== candidato) {
+        aplicarResalteAncla(seleccionadoRef.current, false)
       }
       seleccionadoRef.current = candidato
-      aplicarResalte(candidato.malla, true)
-      if (candidato.malla.userData.pieza) {
-        alSeleccionar(candidato.malla.userData.pieza, candidato.nombre)
-      }
+      aplicarResalteAncla(candidato, true)
+      alSeleccionar(candidato.ubicacionId)
     }
     document.addEventListener('mousedown', alPulsar)
     return () => document.removeEventListener('mousedown', alPulsar)
@@ -296,8 +377,8 @@ function EscenaMuseo({ activo, alSeleccionar, alCambiarCandidata, piezaSeleccion
   // Restaura el resalte pendiente al desmontar.
   useEffect(() => {
     return () => {
-      if (resaltadoRef.current) aplicarResalte(resaltadoRef.current.malla, false)
-      if (seleccionadoRef.current) aplicarResalte(seleccionadoRef.current.malla, false)
+      if (resaltadoRef.current) aplicarResalteAncla(resaltadoRef.current, false)
+      if (seleccionadoRef.current) aplicarResalteAncla(seleccionadoRef.current, false)
     }
   }, [])
 
@@ -327,7 +408,7 @@ function EscenaMuseo({ activo, alSeleccionar, alCambiarCandidata, piezaSeleccion
 
     if (!activo) {
       if (resaltadoRef.current) {
-        aplicarResalte(resaltadoRef.current.malla, false)
+        aplicarResalteAncla(resaltadoRef.current, false)
         resaltadoRef.current = null
         // Avisa al padre solo cuando realmente cambia (aquí, a "ninguna"):
         // así el tooltip se oculta al salir del recorrido sin re-render por frame.
@@ -380,27 +461,30 @@ function EscenaMuseo({ activo, alSeleccionar, alCambiarCandidata, piezaSeleccion
     camara.position.y = ALTURA_OJO
 
     // Apuntado por caja envolvente: barato y suficiente para el resalte.
+    // Solo se consideran anclas que correspondan a una exhibición activa; el
+    // resto del modelo no es clicable (ni se resalta).
     raycaster.setFromCamera({ x: 0, y: 0 }, camara)
     let candidato = null
     let mejorDistancia = Infinity
-    for (const pieza of piezasRef.current) {
-      if (raycaster.ray.intersectBox(pieza.caja, impactoRef.current)) {
+    for (const ancla of anclasRef.current) {
+      if (!clickeables.has(ancla.ubicacionId)) continue
+      if (raycaster.ray.intersectBox(ancla.caja, impactoRef.current)) {
         const distancia = impactoRef.current.distanceToSquared(camara.position)
         if (distancia < mejorDistancia) {
           mejorDistancia = distancia
-          candidato = pieza
+          candidato = ancla
         }
       }
     }
 
     if (candidato !== resaltadoRef.current) {
-      if (resaltadoRef.current) aplicarResalte(resaltadoRef.current.malla, false)
+      if (resaltadoRef.current) aplicarResalteAncla(resaltadoRef.current, false)
       resaltadoRef.current = candidato
-      if (candidato) aplicarResalte(candidato.malla, true)
+      if (candidato) aplicarResalteAncla(candidato, true)
       // Notifica al árbol React SOLO cuando cambia la identidad de la pieza
       // candidata. Nunca se llama a setState por fotograma: si el cursor sigue
       // sobre la misma obra, este bloque no se ejecuta.
-      alCambiarCandidata(candidato ? candidato.nombre : null)
+      alCambiarCandidata(candidato ? candidato.ubicacionId : null)
     }
   })
 
@@ -459,41 +543,16 @@ function Cargando({ progreso }) {
 // Presentación de datos de exhibición
 // ---------------------------------------------------------------------------
 
-// Descripciones provisionales conocidas que NO deben presentarse como
-// información definitiva. Se tratan como vacías.
-const PLACEHOLDERS = new Set(['Registro provisional pendiente de contenido real.'])
-
-function esProvisional(texto) {
-  return typeof texto === 'string' && texto.trim().startsWith('[PROVISIONAL]')
-}
-
-// Devuelve el texto solo si es un valor real y no un marcador provisional.
-function valorReal(valor) {
-  if (typeof valor !== 'string') return null
-  const limpio = valor.trim()
-  if (!limpio || PLACEHOLDERS.has(limpio) || esProvisional(limpio)) return null
-  return limpio
-}
-
-// Una exhibición se considera mostrable si existe y su título no es provisional.
-function exhibicionMostrable(exhibicion) {
-  return Boolean(exhibicion && valorReal(exhibicion.titulo))
-}
-
 // Vista previa compacta al pasar el cursor. No bloquea el centro: se ancla en
 // una esquina y no captura el puntero (pointer-events: none).
-function VistaPreviaPieza({ pieza, exhibicion, correspondenciaPendiente }) {
-  const mostrable = exhibicionMostrable(exhibicion)
-  const nombre = mostrable ? valorReal(exhibicion.titulo) : pieza.etiqueta
-  const sala = mostrable ? valorReal(exhibicion.salaNombre) : `Sala ${pieza.sala}`
+function VistaPreviaPieza({ exhibicion }) {
+  if (!exhibicionMostrable(exhibicion)) return null
+  const vista = primeraVista(exhibicion)
   return (
     <div className="recorrido__previa" role="status" aria-live="polite">
       <span className="recorrido__previa-etiqueta">Obra señalada</span>
-      <span className="recorrido__previa-nombre">{nombre}</span>
-      {sala && <span className="recorrido__previa-sala">{sala}</span>}
-      {correspondenciaPendiente && (
-        <span className="recorrido__previa-nota">Información por confirmar</span>
-      )}
+      <span className="recorrido__previa-nombre">{vista.titulo}</span>
+      {vista.sala && <span className="recorrido__previa-sala">{vista.sala}</span>}
       <span className="recorrido__previa-ayuda">Haz clic para ver la ficha</span>
     </div>
   )
@@ -511,47 +570,64 @@ function Campo({ etiqueta, valor }) {
   )
 }
 
-// Ficha ampliada. Muestra únicamente datos reales; si la correspondencia está
-// pendiente o el registro es provisional, presenta solo la identificación local
-// de la pieza y un aviso neutro, sin inventar contenido.
-function FichaPieza({ pieza, exhibicion, correspondenciaPendiente, errorDatos, onCerrar }) {
+// Ficha ampliada: primera vista + "Ver más" con categoría, materiales,
+// descripción completa, dato curioso y video.
+function FichaPieza({ exhibicion, errorDatos, onCerrar }) {
+  const [verTodo, setVerTodo] = useState(false)
   const mostrable = exhibicionMostrable(exhibicion)
-  const titulo = mostrable ? valorReal(exhibicion.titulo) : pieza.etiqueta
-  const sinDatos = correspondenciaPendiente || !mostrable
+  const vista = primeraVista(exhibicion)
+  const camposMas = verMas(exhibicion)
+  const imagen = exhibicion?.imagenUrl ? urlMedia(exhibicion.imagenUrl) : null
+  const video = exhibicion?.videoUrl ? urlMedia(exhibicion.videoUrl) : null
+  const titulo = mostrable ? vista.titulo : 'Obra sin ficha publicada'
+  const sinDatos = !mostrable
 
   return (
     <div className="recorrido__ficha-ampliada" role="dialog" aria-modal="false" aria-label={titulo}>
-      <button
-        type="button"
-        className="recorrido__ficha-cerrar"
-        onClick={onCerrar}
-        aria-label="Cerrar ficha"
-      >
+      <button type="button" className="recorrido__ficha-cerrar" onClick={onCerrar} aria-label="Cerrar ficha">
         ×
       </button>
 
       <div className="recorrido__ficha-contenido">
-        <span className="recorrido__ficha-sala-cabecera">
-          {mostrable ? (valorReal(exhibicion.salaNombre) ?? `Sala ${pieza.sala}`) : `Sala ${pieza.sala}`}
-        </span>
+        {imagen ? (
+          <img className="recorrido__ficha-imagen" src={imagen} alt={titulo} />
+        ) : (
+          <div className="recorrido__ficha-imagen recorrido__ficha-imagen--vacia">Falta imagen</div>
+        )}
+
+        {vista?.sala && <span className="recorrido__ficha-sala-cabecera">{vista.sala}</span>}
         <h3 className="recorrido__ficha-titulo">{titulo}</h3>
 
         {mostrable && (
           <>
-            <Campo etiqueta="Descripción" valor={exhibicion.descripcion} />
-            <Campo etiqueta="Contexto histórico" valor={exhibicion.contextoHistorico} />
-            <Campo etiqueta="Autor o cultura" valor={exhibicion.autorCultura} />
-            <Campo etiqueta="Período" valor={exhibicion.periodo} />
-            <Campo etiqueta="Material" valor={exhibicion.material} />
-            <Campo etiqueta="Fecha aproximada" valor={exhibicion.fechaCreacionAprox} />
+            {vista.procedencia && <p className="recorrido__ficha-procedencia">{vista.procedencia}</p>}
+            {vista.descripcionCorta && (
+              <p className="recorrido__ficha-corta">{vista.descripcionCorta}</p>
+            )}
+
+            {verTodo && (
+              <>
+                {camposMas.map((campo) => (
+                  <Campo key={campo.etiqueta} etiqueta={campo.etiqueta} valor={campo.valor} />
+                ))}
+                {video && (
+                  <video className="recorrido__ficha-video" src={video} controls preload="metadata" />
+                )}
+              </>
+            )}
+
+            {(camposMas.length > 0 || video) && (
+              <button type="button" className="recorrido__ficha-vermas" onClick={() => setVerTodo((v) => !v)}>
+                {verTodo ? 'Ver menos' : 'Ver más'}
+              </button>
+            )}
           </>
         )}
 
         {sinDatos && (
           <p className="recorrido__ficha-aviso">
             Ficha en preparación: la información de esta obra se irá publicando
-            a medida que se confirme su contenido. Esta pieza conserva su
-            identificación dentro del recorrido.
+            a medida que se confirme su contenido.
           </p>
         )}
 
@@ -568,7 +644,6 @@ function FichaPieza({ pieza, exhibicion, correspondenciaPendiente, errorDatos, o
     </div>
   )
 }
-
 export default function RecorridoMuseo() {
   const contenedorRef = useRef(null)
   const marcoRef = useRef(null)
@@ -582,12 +657,14 @@ export default function RecorridoMuseo() {
   const [errorDatos, setErrorDatos] = useState(false)
   const { progress, active: cargando } = useProgress()
 
-  // Índice codigo -> exhibición, construido una sola vez tras cargar la API.
-  const exhibicionesPorCodigo = useMemo(() => {
+  // Índice ubicacion3dCodigo (EXH_S1_01...) -> exhibición de la API. Es la
+  // única correspondencia entre el modelo y los datos: el visor lee del GLB el
+  // `exhibicion_id` y busca aquí esa misma clave.
+  const exhibicionesPorUbicacion = useMemo(() => {
     if (!catalogo) return null
     const indice = new Map()
     for (const ex of catalogo) {
-      if (ex && ex.codigo) indice.set(ex.codigo, ex)
+      if (ex && ex.ubicacion3dCodigo) indice.set(ex.ubicacion3dCodigo, ex)
     }
     return indice
   }, [catalogo])
@@ -674,41 +751,49 @@ export default function RecorridoMuseo() {
     contenedorRef.current?.requestPointerLock()
   }, [])
 
-  const alCambiarCandidata = useCallback((nombreNodo) => {
-    setPiezaResaltada(nombreNodo ? { nombre: nombreNodo, pieza: PIEZAS[nombreNodo] } : null)
-  }, [])
-
-  // Devuelve la exhibición real asociada a un nodo SOLO si la correspondencia
-  // está confirmada (codigo no nulo) y el registro existe en el catálogo.
-  const exhibicionParaNodo = useCallback(
-    (nombreNodo) => {
-      const codigo = EXHIBICION_POR_NODO[nombreNodo]
-      if (!codigo || !exhibicionesPorCodigo) return null
-      return exhibicionesPorCodigo.get(codigo) ?? null
+  // Solo es clicable una pieza cuya ubicación esté en el catálogo de
+  // exhibiciones ACTIVAS. Se usa tanto para el tooltip como para la ficha.
+  const exhibicionParaUbicacion = useCallback(
+    (ubicacionId) => {
+      if (!ubicacionId || !exhibicionesPorUbicacion) return null
+      return exhibicionesPorUbicacion.get(ubicacionId) ?? null
     },
-    [exhibicionesPorCodigo],
+    [exhibicionesPorUbicacion],
   )
 
-  // Al hacer clic: abre la ficha local y, solo si el nodo tiene una
-  // correspondencia confirmada con un id real, registra una visita (CURSOR).
+  const alCambiarCandidata = useCallback(
+    (ubicacionId) => {
+      if (!ubicacionId) {
+        setPiezaResaltada(null)
+        return
+      }
+      const exhibicion = exhibicionParaUbicacion(ubicacionId)
+      // Si la ubicación no corresponde a ninguna exhibición activa, no es
+      // clicable: no se resalta ni se muestra vista previa.
+      setPiezaResaltada(exhibicion ? { ubicacionId, exhibicion } : null)
+    },
+    [exhibicionParaUbicacion],
+  )
+
+  // Al hacer clic: abre la ficha con datos de la API y registra la visita.
   // El hover, el tooltip y cerrar la ficha nunca llegan aquí.
   const alSeleccionar = useCallback(
-    (nuevaPieza, nombreNodo) => {
-      setPieza({ ...nuevaPieza, nombreNodo })
+    (ubicacionId) => {
+      const exhibicion = exhibicionParaUbicacion(ubicacionId)
+      if (!exhibicion) return
+
+      setPieza({ ubicacionId, exhibicion })
       // Se libera el cursor para que el visitante pueda leer y usar la ficha
       // (sus botones no son accionables con el pointer lock activo).
       if (document.pointerLockElement) document.exitPointerLock()
 
-      const exhibicion = exhibicionParaNodo(nombreNodo)
-      if (exhibicion) {
-        registrarVisita(Number(exhibicion.id), obtenerSesionAnonima(), {
-          fuente: FUENTE_CURSOR,
-        }).catch(() => {
-          // Silencioso a propósito: la visita es telemetría, no navegación.
-        })
-      }
+      registrarVisita(Number(exhibicion.id), obtenerSesionAnonima(), {
+        fuente: FUENTE_CURSOR,
+      }).catch(() => {
+        // Silencioso a propósito: la visita es telemetría, no navegación.
+      })
     },
-    [exhibicionParaNodo],
+    [exhibicionParaUbicacion],
   )
 
   // Cierra la ficha y reanuda el recorrido si el navegador lo permite. Como se
@@ -767,6 +852,7 @@ export default function RecorridoMuseo() {
                 alSeleccionar={alSeleccionar}
                 alCambiarCandidata={alCambiarCandidata}
                 piezaSeleccionada={pieza}
+                exhibicionesPorUbicacion={exhibicionesPorUbicacion}
               />
             </Suspense>
           </Canvas>
@@ -783,11 +869,7 @@ export default function RecorridoMuseo() {
 
               {/* Vista previa al pasar el cursor: solo si NO hay ficha abierta. */}
               {!pieza && piezaResaltada && (
-                <VistaPreviaPieza
-                  pieza={piezaResaltada.pieza}
-                  exhibicion={exhibicionParaNodo(piezaResaltada.nombre)}
-                  correspondenciaPendiente={!EXHIBICION_POR_NODO[piezaResaltada.nombre]}
-                />
+                <VistaPreviaPieza exhibicion={piezaResaltada.exhibicion} />
               )}
             </>
           )}
@@ -797,9 +879,7 @@ export default function RecorridoMuseo() {
               que el visitante la cierre. */}
           {pieza && (
             <FichaPieza
-              pieza={pieza}
-              exhibicion={exhibicionParaNodo(pieza.nombreNodo)}
-              correspondenciaPendiente={!EXHIBICION_POR_NODO[pieza.nombreNodo]}
+              exhibicion={pieza.exhibicion}
               errorDatos={errorDatos}
               onCerrar={cerrarFicha}
             />

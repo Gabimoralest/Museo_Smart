@@ -36,3 +36,7 @@ Thumbs.db
 docker/data/
 # Hash de credenciales MQTT generado en runtime (nunca versionar).
 docker/mosquitto/config/passwd
+
+# --- Multimedia subida en desarrollo (no versionar) ---
+media/
+backend/media/

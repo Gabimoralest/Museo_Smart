@@ -9,6 +9,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -22,9 +23,23 @@ public class Exhibicion {
     @Column(name = "id", nullable = false, updatable = false)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "sala_id", nullable = false)
+    /**
+     * Sala de la exhibicion. Es {@code null} solo para la exhibicion especial
+     * (plaza central), cuya ubicacion 3D tampoco tiene sala.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "sala_id")
     private Sala sala;
+
+    /**
+     * Ubicacion fisica de la exhibicion en el modelo 3D (p. ej. {@code EXH_S1_01}).
+     * SOLO LECTURA en esta fase: la asociacion se gestiona en la base de datos
+     * y no se modifica desde el backend. Puede ser {@code null} si la exhibicion
+     * aun no tiene ubicacion asignada.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "ubicacion_3d_id", insertable = false, updatable = false)
+    private Ubicacion3d ubicacion3d;
 
     @Column(name = "codigo", nullable = false, length = 30)
     private String codigo;
@@ -34,6 +49,14 @@ public class Exhibicion {
 
     @Column(name = "descripcion", columnDefinition = "text")
     private String descripcion;
+
+    /** Descripcion breve para la ficha (V15). Obligatoria al guardar desde la API. */
+    @Column(name = "descripcion_corta", length = 200)
+    private String descripcionCorta;
+
+    /** Dato curioso opcional (V15). */
+    @Column(name = "dato_curioso", columnDefinition = "text")
+    private String datoCurioso;
 
     @Column(name = "contexto_historico", columnDefinition = "text")
     private String contextoHistorico;
@@ -68,6 +91,23 @@ public class Exhibicion {
     @Column(name = "activa", nullable = false)
     private boolean activa = true;
 
+    /**
+     * Ultimo usuario ADMIN/SUPERADMIN que edito la exhibicion (V14). Puede ser
+     * {@code null} si nunca se edito. Se actualiza en la edicion y en el cambio
+     * de estado.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "actualizado_por")
+    private UsuarioAdmin actualizadoPor;
+
+    /**
+     * Version para bloqueo optimista (V14). Hibernate la incrementa en cada
+     * UPDATE y detecta escrituras concurrentes obsoletas.
+     */
+    @Version
+    @Column(name = "version", nullable = false)
+    private Integer version = 0;
+
     @Column(name = "creado_en", nullable = false, insertable = false, updatable = false)
     private OffsetDateTime creadoEn;
 
@@ -84,6 +124,10 @@ public class Exhibicion {
 
     public void setSala(Sala sala) {
         this.sala = sala;
+    }
+
+    public Ubicacion3d getUbicacion3d() {
+        return ubicacion3d;
     }
 
     public String getCodigo() {
@@ -108,6 +152,22 @@ public class Exhibicion {
 
     public void setDescripcion(String descripcion) {
         this.descripcion = descripcion;
+    }
+
+    public String getDescripcionCorta() {
+        return descripcionCorta;
+    }
+
+    public void setDescripcionCorta(String descripcionCorta) {
+        this.descripcionCorta = descripcionCorta;
+    }
+
+    public String getDatoCurioso() {
+        return datoCurioso;
+    }
+
+    public void setDatoCurioso(String datoCurioso) {
+        this.datoCurioso = datoCurioso;
     }
 
     public String getContextoHistorico() {
@@ -196,6 +256,22 @@ public class Exhibicion {
 
     public void setActiva(boolean activa) {
         this.activa = activa;
+    }
+
+    public UsuarioAdmin getActualizadoPor() {
+        return actualizadoPor;
+    }
+
+    public void setActualizadoPor(UsuarioAdmin actualizadoPor) {
+        this.actualizadoPor = actualizadoPor;
+    }
+
+    public Integer getVersion() {
+        return version;
+    }
+
+    public void setVersion(Integer version) {
+        this.version = version;
     }
 
     public OffsetDateTime getCreadoEn() {

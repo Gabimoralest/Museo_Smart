@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   IconoTemplo,
   IconoColeccion,
@@ -8,45 +8,38 @@ import {
   IconoChevron,
   IconoCerrar,
   IconoAdvertencia,
-  IconoCheck,
+  IconoEditar,
 } from './iconos'
-import {
-  OPCIONES_SALA,
-  OPCIONES_ESTADO,
-  OPCIONES_ORDEN,
-  imagenExhibicion,
-} from '../data/exhibicionesData'
-import { listarExhibiciones, cambiarEstadoExhibicion } from '../data/exhibicionesApi'
+import { OPCIONES_ESTADO, OPCIONES_ORDEN } from '../data/exhibicionesData'
+import { listarExhibiciones, urlMedia } from '../data/exhibicionesApi'
+import { listarSalasPublicas } from '../data/exhibicionesPublicasApi'
 import { ErrorHttp } from '../data/httpClient'
 import './GestionExhibiciones.css'
 
-// El backend no expone todavía la imagen de cada exhibición (no hay endpoint de
-// contenido multimedia). Mientras eso no exista, se reutilizan los recursos
-// locales ya presentes en public/images/exhibiciones, asignados de forma estable
-// por identificador. NO son datos simulados de negocio: solo un recurso visual.
-const IMAGENES_DISPONIBLES = [
-  '01-mascara-ceremonial.jpg',
-  '02-fosil-ammonite.jpg',
-  '03-vasija-ceramica.jpg',
-  '04-retrato-historico.jpg',
-  '05-textil-ancestral.jpg',
-  '06-orfebreria-muisca.jpg',
-  '07-escultura-litica.jpg',
-  '08-restos-oseos.jpg',
-]
-
-function imagenPara(exhibicion) {
-  const id = Number(exhibicion.id)
-  const indice = Number.isFinite(id) && id > 0
-    ? (id - 1) % IMAGENES_DISPONIBLES.length
-    : 0
-  return imagenExhibicion(IMAGENES_DISPONIBLES[indice])
+// ---------------------------------------------------------------------------
+// Traducción del DTO real (ExhibicionAdminResponse).
+// ---------------------------------------------------------------------------
+function mapearExhibicion(dto) {
+  const salaId = dto.salaId != null ? Number(dto.salaId) : null
+  // La categoría viene derivada del backend; la especial no tiene sala.
+  const categoria = dto.categoria ?? (dto.especial ? 'Exhibición especial' : '')
+  return {
+    id: Number(dto.id),
+    nombre: dto.titulo ?? '',
+    codigo: dto.codigo ?? '',
+    descripcionCorta: dto.descripcionCorta ?? '',
+    categoria,
+    salaId,
+    sala: dto.especial ? 'Exhibición especial' : (dto.salaNombre ?? ''),
+    especial: Boolean(dto.especial),
+    activa: Boolean(dto.activa),
+    tieneImagen: Boolean(dto.tieneImagen || dto.imagenUrl),
+    imagenUrl: dto.imagenUrl ? urlMedia(dto.imagenUrl) : null,
+    videoUrl: dto.videoUrl ? urlMedia(dto.videoUrl) : null,
+    version: dto.version ?? 0,
+  }
 }
 
-// Traduce el DTO real del backend (ExhibicionResponse) a la forma que ya usan
-// las tarjetas existentes, sin inventar propiedades: nombre<-titulo,
-// sala:'Sala N' a partir de salaId, subtitulo con el nombre real de la sala.
-// Mensaje claro según el tipo de error del cliente HTTP compartido.
 function mensajeDeError(error, porDefecto) {
   if (error instanceof ErrorHttp) {
     if (error.tipo === 'conexion') {
@@ -60,60 +53,38 @@ function mensajeDeError(error, porDefecto) {
   return porDefecto
 }
 
-function mapearExhibicion(dto) {
-  const salaId = dto.salaId != null ? Number(dto.salaId) : null
-  const sala = salaId != null ? `Sala ${salaId}` : ''
-  return {
-    id: Number(dto.id),
-    nombre: dto.titulo ?? '',
-    subtitulo: dto.salaNombre ? `${sala} · ${dto.salaNombre}` : sala,
-    descripcion: dto.descripcion ?? '',
-    codigo: dto.codigo ?? '',
-    salaId: salaId ?? 0,
-    sala,
-    activa: Boolean(dto.activa),
-    imagen: imagenPara(dto),
-  }
+// Marcador neutro cuando la exhibición no tiene imagen.
+function MarcadorImagen() {
+  return (
+    <div className="tarjeta-exh__marcador" role="img" aria-label="Falta imagen">
+      <span className="tarjeta-exh__marcador-texto">Falta imagen</span>
+    </div>
+  )
 }
 
 export default function GestionExhibiciones({
   busqueda: busquedaProp,
   onCambiarBusqueda,
+  onEditar,
 }) {
-  // Exhibiciones reales del backend.
   const [exhibiciones, setExhibiciones] = useState([])
-
-  // Estado de la carga inicial y de errores de la API.
+  const [salas, setSalas] = useState([])
   const [cargando, setCargando] = useState(true)
   const [errorCarga, setErrorCarga] = useState(null)
 
-  // Identificadores con una operación de cambio de estado en curso.
-  const [guardandoIds, setGuardandoIds] = useState(() => new Set())
-
-  // Filtros y ordenamiento
+  // Filtros
   const [busquedaLocal, setBusquedaLocal] = useState('')
   const busqueda = busquedaProp !== undefined ? busquedaProp : busquedaLocal
   const setBusqueda = onCambiarBusqueda || setBusquedaLocal
 
   const [salaFiltro, setSalaFiltro] = useState('todas')
   const [estadoFiltro, setEstadoFiltro] = useState('todos')
+  const [soloSinImagen, setSoloSinImagen] = useState(false)
   const [orden, setOrden] = useState('nombre-asc')
 
-  // Menús desplegables accesibles
-  const [menuAbierto, setMenuAbierto] = useState(null) // 'sala' | 'estado' | 'orden' | null
+  const [menuAbierto, setMenuAbierto] = useState(null)
   const contenedorRef = useRef(null)
 
-  // Estado del modal de confirmación antes de cambiar disponibilidad
-  const [modalConfirmar, setModalConfirmar] = useState({
-    abierto: false,
-    exhibicion: null,
-    nuevoEstado: false,
-  })
-
-  // Mensaje temporal de retroalimentación tras confirmar
-  const [mensajeExito, setMensajeExito] = useState(null)
-
-  // Cerrar menús al hacer clic fuera
   useEffect(() => {
     const alClicFuera = (e) => {
       if (contenedorRef.current && !contenedorRef.current.contains(e.target)) {
@@ -124,8 +95,7 @@ export default function GestionExhibiciones({
     return () => document.removeEventListener('pointerdown', alClicFuera)
   }, [])
 
-  // Carga inicial (y recarga) del listado real desde el backend.
-  const cargarExhibiciones = useCallback(async (signal) => {
+  const cargar = useCallback(async (signal) => {
     setCargando(true)
     setErrorCarga(null)
     try {
@@ -141,149 +111,104 @@ export default function GestionExhibiciones({
 
   useEffect(() => {
     const controlador = new AbortController()
-    cargarExhibiciones(controlador.signal)
+    cargar(controlador.signal)
+    listarSalasPublicas({ signal: controlador.signal })
+      .then((datos) => {
+        if (controlador.signal.aborted) return
+        setSalas((Array.isArray(datos) ? datos : []).slice().sort(
+          (a, b) => (a.orden ?? a.id) - (b.orden ?? b.id),
+        ))
+      })
+      .catch(() => {})
     return () => controlador.abort()
-  }, [cargarExhibiciones])
+  }, [cargar])
 
-  // Cerrar modal con Escape
   useEffect(() => {
     const alPresionarTecla = (e) => {
-      if (e.key === 'Escape') {
-        if (modalConfirmar.abierto) {
-          setModalConfirmar({ abierto: false, exhibicion: null, nuevoEstado: false })
-        }
-        setMenuAbierto(null)
-      }
+      if (e.key === 'Escape') setMenuAbierto(null)
     }
     window.addEventListener('keydown', alPresionarTecla)
     return () => window.removeEventListener('keydown', alPresionarTecla)
-  }, [modalConfirmar.abierto])
+  }, [])
 
-  // Contadores dinámicos calculados a partir de los datos locales
   const contadores = useMemo(() => {
     const total = exhibiciones.length
-    const activas = exhibiciones.filter((item) => item.activa).length
-    const inactivas = total - activas
-    const salasUnicas = new Set(exhibiciones.map((item) => item.sala)).size
-    return { total, activas, inactivas, salas: salasUnicas }
+    const activas = exhibiciones.filter((i) => i.activa).length
+    return {
+      total,
+      activas,
+      inactivas: total - activas,
+      salas: new Set(exhibiciones.filter((i) => !i.especial).map((i) => i.salaId)).size,
+    }
   }, [exhibiciones])
 
-  // Manejador del cambio de búsqueda
-  const manejarCambioBusqueda = (valor) => {
-    setBusqueda(valor)
-  }
+  // Opciones del filtro: "Todas", 6 salas reales, "Exhibición especial".
+  const opcionesSala = useMemo(() => {
+    const base = [{ valor: 'todas', etiqueta: 'Todas las salas' }]
+    for (const s of salas) {
+      base.push({
+        valor: String(s.id),
+        etiqueta: s.codigo3d ? `${s.codigo3d} · ${s.nombre}` : `Sala ${s.id}`,
+      })
+    }
+    base.push({ valor: 'especial', etiqueta: 'Exhibición especial' })
+    return base
+  }, [salas])
 
-  // Filtrado y ordenamiento en tiempo real
-  const exhibicionesFiltradas = useMemo(() => {
+  const filtradas = useMemo(() => {
     const termino = busqueda.trim().toLowerCase()
-
     return exhibiciones
       .filter((item) => {
-        // Filtro por texto en nombre y descripción
         if (termino) {
-          const coincideNombre = item.nombre.toLowerCase().includes(termino)
-          const coincideDesc = item.descripcion.toLowerCase().includes(termino)
-          const coincideSub = item.subtitulo.toLowerCase().includes(termino)
-          if (!coincideNombre && !coincideDesc && !coincideSub) {
-            return false
-          }
+          const coincide = item.nombre.toLowerCase().includes(termino)
+            || item.descripcionCorta.toLowerCase().includes(termino)
+            || item.categoria.toLowerCase().includes(termino)
+          if (!coincide) return false
         }
-
-        // Filtro por sala
-        if (salaFiltro !== 'todas' && item.sala !== salaFiltro) {
-          return false
+        if (salaFiltro === 'especial') {
+          if (!item.especial) return false
+        } else if (salaFiltro !== 'todas') {
+          if (String(item.salaId) !== String(salaFiltro)) return false
         }
-
-        // Filtro por estado
         if (estadoFiltro === 'activas' && !item.activa) return false
         if (estadoFiltro === 'inactivas' && item.activa) return false
-
+        if (soloSinImagen && item.tieneImagen) return false
         return true
       })
       .sort((a, b) => {
         switch (orden) {
-          case 'nombre-asc':
-            return a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' })
           case 'nombre-desc':
             return b.nombre.localeCompare(a.nombre, 'es', { sensitivity: 'base' })
-          case 'sala-asc':
-            return a.salaId - b.salaId || a.nombre.localeCompare(b.nombre, 'es')
+          case 'sala-asc': {
+            const sa = a.especial ? 99 : a.salaId
+            const sb = b.especial ? 99 : b.salaId
+            return sa - sb || a.nombre.localeCompare(b.nombre, 'es')
+          }
           case 'estado-activas':
             return (b.activa === a.activa ? 0 : b.activa ? 1 : -1) || a.nombre.localeCompare(b.nombre, 'es')
           case 'estado-inactivas':
             return (a.activa === b.activa ? 0 : a.activa ? 1 : -1) || a.nombre.localeCompare(b.nombre, 'es')
           default:
-            return 0
+            return a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' })
         }
       })
-  }, [exhibiciones, busqueda, salaFiltro, estadoFiltro, orden])
-
-  // Iniciar flujo de confirmación antes de activar o desactivar
-  const solicitarCambioDisponibilidad = (exhibicion) => {
-    setModalConfirmar({
-      abierto: true,
-      exhibicion,
-      nuevoEstado: !exhibicion.activa,
-    })
-  }
-
-  // Confirmar y persistir el cambio en el backend.
-  const confirmarCambioDisponibilidad = async () => {
-    const { exhibicion, nuevoEstado } = modalConfirmar
-    if (!exhibicion) return
-
-    const id = exhibicion.id
-    // Evita solicitudes duplicadas ante clics repetidos.
-    if (guardandoIds.has(id)) return
-
-    setGuardandoIds((prev) => new Set(prev).add(id))
-    setModalConfirmar({ abierto: false, exhibicion: null, nuevoEstado: false })
-
-    try {
-      const actualizada = await cambiarEstadoExhibicion(id, nuevoEstado)
-      // La respuesta del backend es la fuente de verdad.
-      setExhibiciones((anteriores) =>
-        anteriores.map((item) =>
-          item.id === Number(actualizada.id)
-            ? { ...item, ...mapearExhibicion(actualizada) }
-            : item,
-        ),
-      )
-      setMensajeExito({
-        texto: `«${exhibicion.nombre}» ahora está ${actualizada.activa ? 'activa' : 'inactiva'}.`,
-        tipo: actualizada.activa ? 'activa' : 'inactiva',
-      })
-    } catch (error) {
-      // No se cambia el estado local: se conserva el valor correcto del backend.
-      setMensajeExito({
-        texto: mensajeDeError(error, 'No se pudo cambiar el estado. Inténtalo de nuevo.'),
-        tipo: 'error',
-      })
-    } finally {
-      setGuardandoIds((prev) => {
-        const copia = new Set(prev)
-        copia.delete(id)
-        return copia
-      })
-      setTimeout(() => {
-        setMensajeExito(null)
-      }, 3800)
-    }
-  }
-
-  const cancelarCambioDisponibilidad = () => {
-    setModalConfirmar({ abierto: false, exhibicion: null, nuevoEstado: false })
-  }
+  }, [exhibiciones, busqueda, salaFiltro, estadoFiltro, soloSinImagen, orden])
 
   const limpiarFiltros = () => {
     setBusqueda('')
     setSalaFiltro('todas')
     setEstadoFiltro('todos')
+    setSoloSinImagen(false)
     setOrden('nombre-asc')
   }
 
+  const editar = (item) => {
+    if (onEditar) onEditar(item.id)
+    else window.location.hash = `#/admin/exhibiciones/${item.id}/editar`
+  }
+
   const etiquetaSalaActual =
-    OPCIONES_SALA.find((o) => o.valor === salaFiltro)?.etiqueta || 'Todas las salas'
+    opcionesSala.find((o) => o.valor === salaFiltro)?.etiqueta || 'Todas las salas'
   const etiquetaEstadoActual =
     OPCIONES_ESTADO.find((o) => o.valor === estadoFiltro)?.etiqueta || 'Todos los estados'
   const etiquetaOrdenActual =
@@ -291,23 +216,13 @@ export default function GestionExhibiciones({
 
   return (
     <div className="gestion-exh" ref={contenedorRef}>
-      {/* Toast de confirmación de cambio */}
-      {mensajeExito && (
-        <div className={`gestion-exh__toast gestion-exh__toast--${mensajeExito.tipo}`} role="status" aria-live="polite">
-          {mensajeExito.tipo === 'error' ? <IconoAdvertencia /> : <IconoCheck />}
-          <span>{mensajeExito.texto}</span>
-        </div>
-      )}
-
-      {/* ===================== Cabecera de la sección ===================== */}
       <header className="gestion-exh__cabecera">
         <h1 className="gestion-exh__titulo">Gestión de exhibiciones</h1>
         <p className="gestion-exh__subtitulo">
-          Consulta y administra la disponibilidad de las exhibiciones del museo.
+          Edita el contenido y el multimedia de cada exhibición del museo.
         </p>
       </header>
 
-      {/* ===================== Tarjetas de resumen ===================== */}
       <section className="gestion-exh__resumen" aria-label="Métricas de exhibiciones">
         <article className="stat-card">
           <div className="stat-card__icono-contenedor stat-card__icono-contenedor--dorado" aria-hidden="true">
@@ -318,7 +233,6 @@ export default function GestionExhibiciones({
             <span className="stat-card__etiqueta">Total de exhibiciones</span>
           </div>
         </article>
-
         <article className="stat-card">
           <div className="stat-card__icono-contenedor stat-card__icono-contenedor--verde" aria-hidden="true">
             <span className="stat-card__punto stat-card__punto--verde" />
@@ -328,7 +242,6 @@ export default function GestionExhibiciones({
             <span className="stat-card__etiqueta">Activas</span>
           </div>
         </article>
-
         <article className="stat-card">
           <div className="stat-card__icono-contenedor stat-card__icono-contenedor--rojo" aria-hidden="true">
             <span className="stat-card__punto stat-card__punto--rojo" />
@@ -338,7 +251,6 @@ export default function GestionExhibiciones({
             <span className="stat-card__etiqueta">Inactivas</span>
           </div>
         </article>
-
         <article className="stat-card">
           <div className="stat-card__icono-contenedor stat-card__icono-contenedor--dorado" aria-hidden="true">
             <IconoColeccion className="stat-card__icono" />
@@ -350,36 +262,26 @@ export default function GestionExhibiciones({
         </article>
       </section>
 
-      {/* ===================== Barra de filtros y orden ===================== */}
       <section className="gestion-exh__controles" aria-label="Filtros y ordenamiento">
-        {/* Buscador de exhibición */}
         <div className="filtro-buscar">
-          <span className="filtro-buscar__icono" aria-hidden="true">
-            <IconoBuscar />
-          </span>
+          <span className="filtro-buscar__icono" aria-hidden="true"><IconoBuscar /></span>
           <input
             id="filtro-busqueda-input"
             type="search"
             className="filtro-buscar__input"
-            placeholder="Buscar por nombre o descripción..."
+            placeholder="Buscar por nombre, categoría o descripción..."
             value={busqueda}
-            onChange={(e) => manejarCambioBusqueda(e.target.value)}
-            aria-label="Buscar por nombre o descripción"
+            onChange={(e) => setBusqueda(e.target.value)}
+            aria-label="Buscar exhibiciones"
           />
           {busqueda && (
-            <button
-              type="button"
-              className="filtro-buscar__limpiar"
-              onClick={() => manejarCambioBusqueda('')}
-              aria-label="Borrar búsqueda"
-            >
+            <button type="button" className="filtro-buscar__limpiar" onClick={() => setBusqueda('')} aria-label="Borrar búsqueda">
               <IconoCerrar />
             </button>
           )}
         </div>
 
         <div className="gestion-exh__filtros-grupo">
-          {/* Dropdown Salas */}
           <div className="menu-desplegable">
             <button
               type="button"
@@ -392,20 +294,16 @@ export default function GestionExhibiciones({
               <span className="menu-desplegable__texto">{etiquetaSalaActual}</span>
               <IconoChevron className="menu-desplegable__chevron" />
             </button>
-
             {menuAbierto === 'sala' && (
               <div className="menu-desplegable__lista" role="listbox" aria-label="Filtrar por sala">
-                {OPCIONES_SALA.map((opcion) => (
+                {opcionesSala.map((opcion) => (
                   <button
                     key={opcion.valor}
                     type="button"
                     role="option"
                     aria-selected={salaFiltro === opcion.valor}
                     className={`menu-desplegable__item${salaFiltro === opcion.valor ? ' menu-desplegable__item--seleccionado' : ''}`}
-                    onClick={() => {
-                      setSalaFiltro(opcion.valor)
-                      setMenuAbierto(null)
-                    }}
+                    onClick={() => { setSalaFiltro(opcion.valor); setMenuAbierto(null) }}
                   >
                     {opcion.etiqueta}
                   </button>
@@ -414,7 +312,6 @@ export default function GestionExhibiciones({
             )}
           </div>
 
-          {/* Dropdown Estados */}
           <div className="menu-desplegable">
             <button
               type="button"
@@ -427,7 +324,6 @@ export default function GestionExhibiciones({
               <span className="menu-desplegable__texto">{etiquetaEstadoActual}</span>
               <IconoChevron className="menu-desplegable__chevron" />
             </button>
-
             {menuAbierto === 'estado' && (
               <div className="menu-desplegable__lista" role="listbox" aria-label="Filtrar por estado">
                 {OPCIONES_ESTADO.map((opcion) => (
@@ -437,10 +333,7 @@ export default function GestionExhibiciones({
                     role="option"
                     aria-selected={estadoFiltro === opcion.valor}
                     className={`menu-desplegable__item${estadoFiltro === opcion.valor ? ' menu-desplegable__item--seleccionado' : ''}`}
-                    onClick={() => {
-                      setEstadoFiltro(opcion.valor)
-                      setMenuAbierto(null)
-                    }}
+                    onClick={() => { setEstadoFiltro(opcion.valor); setMenuAbierto(null) }}
                   >
                     {opcion.etiqueta}
                   </button>
@@ -449,7 +342,15 @@ export default function GestionExhibiciones({
             )}
           </div>
 
-          {/* Dropdown Orden */}
+          <button
+            type="button"
+            className={`gestion-exh__filtro-rapido${soloSinImagen ? ' is-activo' : ''}`}
+            aria-pressed={soloSinImagen}
+            onClick={() => setSoloSinImagen((v) => !v)}
+          >
+            Sin imagen
+          </button>
+
           <div className="menu-desplegable menu-desplegable--orden">
             <button
               type="button"
@@ -465,7 +366,6 @@ export default function GestionExhibiciones({
               </span>
               <IconoChevron className="menu-desplegable__chevron" />
             </button>
-
             {menuAbierto === 'orden' && (
               <div className="menu-desplegable__lista menu-desplegable__lista--derecha" role="listbox" aria-label="Ordenar exhibiciones">
                 {OPCIONES_ORDEN.map((opcion) => (
@@ -475,10 +375,7 @@ export default function GestionExhibiciones({
                     role="option"
                     aria-selected={orden === opcion.valor}
                     className={`menu-desplegable__item${orden === opcion.valor ? ' menu-desplegable__item--seleccionado' : ''}`}
-                    onClick={() => {
-                      setOrden(opcion.valor)
-                      setMenuAbierto(null)
-                    }}
+                    onClick={() => { setOrden(opcion.valor); setMenuAbierto(null) }}
                   >
                     {opcion.etiqueta}
                   </button>
@@ -489,174 +386,73 @@ export default function GestionExhibiciones({
         </div>
       </section>
 
-      {/* ===================== Error de carga ===================== */}
       {errorCarga && !cargando && (
         <div className="gestion-exh__vacio gestion-exh__vacio--error" role="alert">
-          <div className="gestion-exh__vacio-icono" aria-hidden="true">
-            <IconoAdvertencia />
-          </div>
+          <div className="gestion-exh__vacio-icono" aria-hidden="true"><IconoAdvertencia /></div>
           <h2 className="gestion-exh__vacio-titulo">No se pudieron cargar las exhibiciones</h2>
           <p className="gestion-exh__vacio-texto">{errorCarga}</p>
-          <button
-            type="button"
-            className="gestion-exh__vacio-boton"
-            onClick={() => cargarExhibiciones()}
-          >
+          <button type="button" className="gestion-exh__vacio-boton" onClick={() => cargar()}>
             Reintentar
           </button>
         </div>
       )}
 
-      {/* ===================== Carga inicial ===================== */}
       {cargando && (
         <div className="gestion-exh__vacio" role="status" aria-live="polite">
-          <div className="gestion-exh__vacio-icono" aria-hidden="true">
-            <IconoColeccion />
-          </div>
+          <div className="gestion-exh__vacio-icono" aria-hidden="true"><IconoColeccion /></div>
           <p className="gestion-exh__vacio-texto">Cargando exhibiciones…</p>
         </div>
       )}
 
-      {/* ===================== Cuadrícula de exhibiciones ===================== */}
-      {!cargando && !errorCarga && exhibicionesFiltradas.length > 0 ? (
+      {!cargando && !errorCarga && filtradas.length > 0 && (
         <section className="gestion-exh__cuadricula" aria-label="Lista de exhibiciones">
-          {exhibicionesFiltradas.map((item) => (
+          {filtradas.map((item) => (
             <article className="tarjeta-exh" key={item.id} id={`exhibicion-${item.id}`}>
-              {/* Contenedor de imagen */}
               <div className="tarjeta-exh__imagen-contenedor">
-                <img
-                  src={item.imagen}
-                  alt={item.nombre}
-                  className="tarjeta-exh__imagen"
-                  loading="lazy"
-                />
-
-                {/* Badge de estado en la esquina superior derecha */}
-                <span
-                  className={`tarjeta-exh__badge ${
-                    item.activa ? 'tarjeta-exh__badge--activa' : 'tarjeta-exh__badge--inactiva'
-                  }`}
-                >
+                {item.imagenUrl ? (
+                  <img src={item.imagenUrl} alt={item.nombre} className="tarjeta-exh__imagen" loading="lazy" />
+                ) : (
+                  <MarcadorImagen />
+                )}
+                <span className={`tarjeta-exh__badge ${item.activa ? 'tarjeta-exh__badge--activa' : 'tarjeta-exh__badge--inactiva'}`}>
                   <span className="tarjeta-exh__badge-punto" aria-hidden="true" />
                   {item.activa ? 'Activa' : 'Inactiva'}
                 </span>
+                {!item.tieneImagen && (
+                  <span className="tarjeta-exh__badge-imagen">Falta imagen</span>
+                )}
               </div>
 
-              {/* Cuerpo de la tarjeta */}
               <div className="tarjeta-exh__cuerpo">
                 <h2 className="tarjeta-exh__nombre">{item.nombre}</h2>
-                <p className="tarjeta-exh__subtitulo">{item.subtitulo}</p>
-                <p className="tarjeta-exh__descripcion">{item.descripcion}</p>
+                <p className="tarjeta-exh__subtitulo">
+                  {item.especial ? 'Exhibición especial' : (item.sala || item.categoria)}
+                </p>
+                {item.descripcionCorta && (
+                  <p className="tarjeta-exh__descripcion">{item.descripcionCorta}</p>
+                )}
 
-                {/* Control de disponibilidad */}
-                <div className="tarjeta-exh__disponibilidad">
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={item.activa}
-                    aria-busy={guardandoIds.has(item.id)}
-                    disabled={guardandoIds.has(item.id)}
-                    aria-label={`Cambiar disponibilidad de ${item.nombre}. Estado actual: ${
-                      item.activa ? 'Activa' : 'Inactiva'
-                    }`}
-                    className={`switch-control ${item.activa ? 'switch-control--activo' : ''}`}
-                    onClick={() => solicitarCambioDisponibilidad(item)}
-                  >
-                    <span className="switch-control__pista">
-                      <span className="switch-control__manija" />
-                    </span>
+                <div className="tarjeta-exh__acciones">
+                  <button type="button" className="boton-exh boton-exh--editar" onClick={() => editar(item)}>
+                    <IconoEditar /> Editar
                   </button>
-
-                  <div className="tarjeta-exh__disp-textos">
-                    <span className="tarjeta-exh__disp-estado">
-                      {item.activa ? 'Disponibilidad activa' : 'Disponibilidad inactiva'}
-                    </span>
-                    <span className="tarjeta-exh__disp-ayuda">
-                      {item.activa
-                        ? 'Visible en el recorrido virtual.'
-                        : 'No visible en el recorrido virtual.'}
-                    </span>
-                  </div>
                 </div>
               </div>
             </article>
           ))}
         </section>
-      ) : (
-        !cargando &&
-        !errorCarga && (
-          /* Estado vacío */
-          <div className="gestion-exh__vacio" role="status">
-            <div className="gestion-exh__vacio-icono" aria-hidden="true">
-              <IconoBuscar />
-            </div>
-            <h2 className="gestion-exh__vacio-titulo">No se encontraron exhibiciones</h2>
-            <p className="gestion-exh__vacio-texto">
-              No hay exhibiciones que coincidan con los filtros o el término de búsqueda ingresado.
-            </p>
-            <button type="button" className="gestion-exh__vacio-boton" onClick={limpiarFiltros}>
-              Restablecer todos los filtros
-            </button>
-          </div>
-        )
       )}
 
-      {/* ===================== Modal de confirmación ===================== */}
-      {modalConfirmar.abierto && modalConfirmar.exhibicion && (
-        <div className="modal-disp" role="dialog" aria-modal="true" aria-labelledby="modal-disp-titulo">
-          <div className="modal-disp__telon" onClick={cancelarCambioDisponibilidad} aria-hidden="true" />
-          <div className="modal-disp__dialogo">
-            <div className="modal-disp__icono-aviso" aria-hidden="true">
-              <IconoAdvertencia />
-            </div>
-
-            <h2 className="modal-disp__titulo" id="modal-disp-titulo">
-              {modalConfirmar.nuevoEstado
-                ? '¿Activar disponibilidad de la exhibición?'
-                : '¿Desactivar disponibilidad de la exhibición?'}
-            </h2>
-
-            <p className="modal-disp__descripcion">
-              Estás a punto de cambiar el estado de{' '}
-              <strong>«{modalConfirmar.exhibicion.nombre}»</strong> a{' '}
-              <span className={modalConfirmar.nuevoEstado ? 'texto-activa' : 'texto-inactiva'}>
-                {modalConfirmar.nuevoEstado ? 'Activa' : 'Inactiva'}
-              </span>
-              .
-            </p>
-
-            <p className="modal-disp__detalle">
-              {modalConfirmar.nuevoEstado
-                ? 'La exhibición volverá a ser visible para los visitantes en el recorrido virtual del museo.'
-                : 'La exhibición dejará de estar visible temporalmente en el recorrido virtual para el público general.'}
-            </p>
-
-            <div className="modal-disp__nota-simulada" role="note">
-              El cambio se guardará en el servidor y quedará registrado en el historial de la
-              exhibición.
-            </div>
-
-            <div className="modal-disp__acciones">
-              <button
-                type="button"
-                className="modal-disp__boton-cancelar"
-                onClick={cancelarCambioDisponibilidad}
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                className={`modal-disp__boton-confirmar ${
-                  modalConfirmar.nuevoEstado
-                    ? 'modal-disp__boton-confirmar--activar'
-                    : 'modal-disp__boton-confirmar--desactivar'
-                }`}
-                onClick={confirmarCambioDisponibilidad}
-              >
-                {modalConfirmar.nuevoEstado ? 'Confirmar y activar' : 'Confirmar y desactivar'}
-              </button>
-            </div>
-          </div>
+      {!cargando && !errorCarga && filtradas.length === 0 && (
+        <div className="gestion-exh__vacio" role="status">
+          <div className="gestion-exh__vacio-icono" aria-hidden="true"><IconoBuscar /></div>
+          <h2 className="gestion-exh__vacio-titulo">No se encontraron exhibiciones</h2>
+          <p className="gestion-exh__vacio-texto">
+            No hay exhibiciones que coincidan con los filtros o el término de búsqueda.
+          </p>
+          <button type="button" className="gestion-exh__vacio-boton" onClick={limpiarFiltros}>
+            Restablecer todos los filtros
+          </button>
         </div>
       )}
     </div>

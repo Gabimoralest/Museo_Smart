@@ -30,6 +30,14 @@ public class Sala {
     @Column(name = "orden", nullable = false)
     private Short orden;
 
+    /**
+     * Codigo estable de la sala en el modelo 3D (Blender): {@code SALA_1..SALA_6}.
+     * Se expone en la API publica para que el visor pueda cruzar el modelo con
+     * los datos sin depender de nombres de nodo ni de ids numericos.
+     */
+    @Column(name = "codigo_3d", nullable = false, length = 20)
+    private String codigo3d;
+
     @Column(name = "creado_en", nullable = false, insertable = false, updatable = false)
     private OffsetDateTime creadoEn;
 
@@ -70,6 +78,14 @@ public class Sala {
 
     public void setOrden(Short orden) {
         this.orden = orden;
+    }
+
+    public String getCodigo3d() {
+        return codigo3d;
+    }
+
+    public void setCodigo3d(String codigo3d) {
+        this.codigo3d = codigo3d;
     }
 
     public OffsetDateTime getCreadoEn() {

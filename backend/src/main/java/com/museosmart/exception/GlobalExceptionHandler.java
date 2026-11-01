@@ -47,6 +47,36 @@ public class GlobalExceptionHandler {
         return construir(HttpStatus.CONFLICT, ex.getMessage(), request, null);
     }
 
+    @ExceptionHandler(OperacionProhibidaException.class)
+    public ResponseEntity<ApiErrorResponse> manejarOperacionProhibida(
+            OperacionProhibidaException ex, HttpServletRequest request) {
+        return construir(HttpStatus.FORBIDDEN, ex.getMessage(), request, null);
+    }
+
+    /**
+     * Un archivo subido supera el limite configurado en spring.servlet.multipart.
+     * Se traduce a 413 (Payload Too Large) en lugar de un 500 generico.
+     */
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiErrorResponse> manejarArchivoDemasiadoGrande(
+            org.springframework.web.multipart.MaxUploadSizeExceededException ex, HttpServletRequest request) {
+        return construir(HttpStatus.PAYLOAD_TOO_LARGE,
+                "El archivo supera el tamaño máximo permitido (imagen 5 MB, video 50 MB)",
+                request, null);
+    }
+
+    /**
+     * Escritura concurrente detectada por el @Version de Hibernate: se traduce a
+     * 409 con un mensaje accionable para el administrador.
+     */
+    @ExceptionHandler(org.springframework.orm.ObjectOptimisticLockingFailureException.class)
+    public ResponseEntity<ApiErrorResponse> manejarBloqueoOptimista(
+            org.springframework.orm.ObjectOptimisticLockingFailureException ex, HttpServletRequest request) {
+        return construir(HttpStatus.CONFLICT,
+                "Otro administrador modificó esta exhibición; recarga para ver los cambios",
+                request, null);
+    }
+
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiErrorResponse> manejarIntegridad(
             DataIntegrityViolationException ex, HttpServletRequest request) {

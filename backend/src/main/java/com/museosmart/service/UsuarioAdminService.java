@@ -1,6 +1,7 @@
 package com.museosmart.service;
 
 import com.museosmart.entity.UsuarioAdmin;
+import com.museosmart.exception.OperacionProhibidaException;
 import com.museosmart.exception.RecursoNoEncontradoException;
 import com.museosmart.exception.ReglaNegocioException;
 import com.museosmart.repository.UsuarioAdminRepository;
@@ -18,7 +19,10 @@ public class UsuarioAdminService {
     public static final String ROL_SUPERADMIN = "SUPERADMIN";
     public static final String ROL_ADMIN = "ADMIN";
 
-    private static final Set<String> ROLES_VALIDOS = Set.of(ROL_SUPERADMIN, ROL_ADMIN);
+    /** Mensaje unico para cualquier intento de modificar la cuenta SuperAdmin. */
+    public static final String MENSAJE_SUPERADMIN_PROTEGIDO =
+            "La cuenta de SuperAdmin no se puede modificar desde el panel";
+
     private static final Set<String> ESTADOS_VALIDOS = Set.of("ACTIVO", "INACTIVO", "BLOQUEADO");
     private static final String ESTADO_ACTIVO = "ACTIVO";
 
@@ -40,10 +44,9 @@ public class UsuarioAdminService {
     }
 
     @Transactional
-    public UsuarioAdmin crear(String nombre, String correo, String rol, String contrasenaPlana) {
+    public UsuarioAdmin crear(String nombre, String correo, String contrasenaPlana) {
         validarTextoObligatorio(nombre, "El nombre es obligatorio");
         validarTextoObligatorio(correo, "El correo es obligatorio");
-        validarRol(rol);
         validarTextoObligatorio(contrasenaPlana, "La contraseña es obligatoria");
 
         if (usuarioAdminRepository.existsByCorreoIgnoreCase(correo)) {
@@ -53,12 +56,30 @@ public class UsuarioAdminService {
         UsuarioAdmin usuario = new UsuarioAdmin();
         usuario.setNombre(nombre);
         usuario.setCorreo(correo);
-        usuario.setRol(rol);
+        // Las cuentas creadas desde el panel son SIEMPRE ADMIN. El SUPERADMIN
+        // unico se provisiona desde el backend (SuperAdminInitializer).
+        usuario.setRol(ROL_ADMIN);
         usuario.setEstado(ESTADO_ACTIVO);
         usuario.setPrimerInicioSesion(true);
         usuario.setHashContrasena(passwordEncoder.encode(contrasenaPlana));
 
         return usuarioAdminRepository.save(usuario);
+    }
+
+    /**
+     * Rechaza un rol distinto de ADMIN (p. ej. {@code SUPERADMIN}) enviado en la
+     * peticion. El rol no se persiste: solo actua como salvaguarda.
+     *
+     * @throws ReglaNegocioException (400) si el rol no es null/vacio ni ADMIN.
+     */
+    public void validarRolNoEscalable(String rol) {
+        if (rol == null || rol.isBlank()) {
+            return;
+        }
+        if (!ROL_ADMIN.equals(rol.trim().toUpperCase())) {
+            throw new ReglaNegocioException(
+                    "No se puede crear ni asignar el rol " + rol + ": las cuentas del panel son siempre ADMIN");
+        }
     }
 
     @Transactional
@@ -67,6 +88,7 @@ public class UsuarioAdminService {
         validarTextoObligatorio(correo, "El correo es obligatorio");
 
         UsuarioAdmin usuario = obtenerPorId(id);
+        prohibirSuperAdmin(usuario);
 
         if (usuarioAdminRepository.findByCorreoIgnoreCase(correo)
                 .filter(otro -> !otro.getId().equals(id))
@@ -84,10 +106,7 @@ public class UsuarioAdminService {
         validarEstado(nuevoEstado);
 
         UsuarioAdmin usuario = obtenerPorId(id);
-
-        if (ROL_SUPERADMIN.equals(usuario.getRol()) && requiereProteccionSuperAdmin(nuevoEstado)) {
-            protegerUltimoSuperAdminActivo(id);
-        }
+        prohibirSuperAdmin(usuario);
 
         // Cualquier cambio de estado incrementa la version de seguridad: invalida
         // los JWT previos. Asi, reactivar una cuenta no rehabilita sesiones antiguas.
@@ -102,50 +121,18 @@ public class UsuarioAdminService {
     @Transactional
     public void eliminar(Long id) {
         UsuarioAdmin usuario = obtenerPorId(id);
-
-        if (ROL_SUPERADMIN.equals(usuario.getRol()) && ESTADO_ACTIVO.equals(usuario.getEstado())) {
-            protegerUltimoSuperAdminActivo(id);
-        }
+        prohibirSuperAdmin(usuario);
 
         usuarioAdminRepository.delete(usuario);
     }
 
-    private boolean requiereProteccionSuperAdmin(String nuevoEstado) {
-        return !ESTADO_ACTIVO.equals(nuevoEstado);
-    }
-
     /**
-     * Serializa las operaciones que pueden dejar el sistema sin SuperAdmin activo.
-     *
-     * Estrategia: se adquiere un bloqueo pesimista de escritura (SELECT ... FOR UPDATE)
-     * sobre TODAS las filas de rol SUPERADMIN, ordenadas por id. Ordenar por id fija un
-     * orden de adquisición determinista y evita deadlocks entre transacciones.
-     *
-     * Punto de sincronizacion: el conjunto de filas SUPERADMIN es el recurso compartido,
-     * porque justamente ese conjunto determina cuantos SuperAdmin activos existen. Al
-     * bloquearlo, una segunda transaccion que intente desactivar/eliminar otro SuperAdmin
-     * espera hasta el fin de la primera, de modo que ya ve el estado actualizado y no puede
-     * superar la comprobacion.
-     *
-     * Nota: si el registro objetivo no existe como SUPERADMIN (caso ya validado antes),
-     * no se llega a este metodo.
+     * La cuenta SuperAdmin no se edita, desactiva ni elimina desde el panel.
+     * Solo el SUPERADMIN puede cambiar su propia contrasena por el flujo normal.
      */
-    private void protegerUltimoSuperAdminActivo(Long idObjetivo) {
-        List<UsuarioAdmin> superAdmins = usuarioAdminRepository.findByRolForUpdate(ROL_SUPERADMIN);
-
-        long activos = superAdmins.stream()
-                .filter(u -> ESTADO_ACTIVO.equals(u.getEstado()))
-                .count();
-
-        if (activos <= 1 && superAdmins.stream().anyMatch(u -> u.getId().equals(idObjetivo))) {
-            throw new ReglaNegocioException(
-                    "No se puede desactivar, bloquear ni eliminar al último SuperAdmin activo");
-        }
-    }
-
-    private void validarRol(String rol) {
-        if (rol == null || !ROLES_VALIDOS.contains(rol)) {
-            throw new ReglaNegocioException("Rol inválido: " + rol + ". Valores permitidos: " + ROLES_VALIDOS);
+    private void prohibirSuperAdmin(UsuarioAdmin usuario) {
+        if (ROL_SUPERADMIN.equals(usuario.getRol())) {
+            throw new OperacionProhibidaException(MENSAJE_SUPERADMIN_PROTEGIDO);
         }
     }
 

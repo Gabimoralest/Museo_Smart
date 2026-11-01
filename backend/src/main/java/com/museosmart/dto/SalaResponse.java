@@ -18,6 +18,10 @@ public record SalaResponse(
         String estado,
 
         @Schema(description = "Orden de presentación", example = "1")
-        Short orden
+        Short orden,
+
+        @Schema(description = "Código estable de la sala en el modelo 3D (Blender)",
+                example = "SALA_1")
+        String codigo3d
 ) {
 }

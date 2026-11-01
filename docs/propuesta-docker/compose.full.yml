@@ -1,0 +1,246 @@
+# ============================================================
+# Museo_Smart - Stack completo (PROPUESTA, ARCHIVO NUEVO)
+# ------------------------------------------------------------
+# NO existe en el repositorio. Se entrega como diseño coherente con el
+# código real:
+#   - PostgreSQL 16 (la app usa Flyway V1..V10)
+#   - Backend Spring Boot 3.3.4 / Java 21
+#   - Frontend React/Vite servido por Nginx (mismo origen que /api)
+#   - Mosquitto 2.0.20 con autenticación
+#   - Node-RED 4.0.9 (simulador, flujo existente)
+#   - InfluxDB 2.7.11 (bucket con retención 90d)
+#   - Redis 7.4.1 (definido igual que en el compose actual, PERO el backend
+#     no lo usa; se deja comentado para no añadir servicios innecesarios)
+#
+# Ubicación sugerida: docker/compose.full.yml
+# Uso:
+#   Copy-Item .env.full.example .env.full
+#   docker compose --env-file .env.full -f compose.full.yml up -d --build
+#
+# ADVERTENCIA: no usar "docker compose ... down -v" salvo que quiera
+# BORRAR la base de datos y el histórico de InfluxDB.
+# ============================================================
+name: museosmart-full
+
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: museosmart-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-Museo_Smart}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?define POSTGRES_PASSWORD}
+      TZ: ${TZ:-America/Bogota}
+    ports:
+      # Opcional: expuesto solo para administración desde el host.
+      - "${POSTGRES_HOST_PORT:-5433}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - museosmart
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-Museo_Smart}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  mosquitto:
+    image: eclipse-mosquitto:2.0.20
+    container_name: museosmart-mosquitto
+    restart: unless-stopped
+    entrypoint: ["/mosquitto/entrypoint.sh"]
+    environment:
+      MQTT_USERNAME: ${MQTT_USERNAME:?define MQTT_USERNAME}
+      MQTT_PASSWORD: ${MQTT_PASSWORD:?define MQTT_PASSWORD}
+    volumes:
+      - ../mosquitto/config:/mosquitto/config
+      - ../mosquitto/mosquitto-entrypoint.sh:/mosquitto/entrypoint.sh:ro
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+    networks:
+      - museosmart
+    healthcheck:
+      test: ["CMD", "mosquitto_pub", "-h", "localhost", "-p", "1883",
+             "-u", "${MQTT_USERNAME}", "-P", "${MQTT_PASSWORD}",
+             "-t", "museo/healthcheck", "-m", "ok"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+
+  influxdb:
+    image: influxdb:2.7.11
+    container_name: museosmart-influxdb
+    restart: unless-stopped
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: ${INFLUX_USERNAME:?define INFLUX_USERNAME}
+      DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUX_PASSWORD:?define INFLUX_PASSWORD}
+      DOCKER_INFLUXDB_INIT_ORG: ${INFLUX_ORG:-museo_smart}
+      DOCKER_INFLUXDB_INIT_BUCKET: ${INFLUX_BUCKET:-museo_smart_ambiental}
+      DOCKER_INFLUXDB_INIT_RETENTION: 90d
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUX_TOKEN:?define INFLUX_TOKEN}
+    ports:
+      - "${INFLUX_HOST_PORT:-8087}:8086"
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+      - influxdb_config:/etc/influxdb2
+    networks:
+      - museosmart
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8086/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  nodered:
+    image: nodered/node-red:4.0.9
+    container_name: museosmart-nodered
+    restart: unless-stopped
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    environment:
+      TZ: ${TZ:-America/Bogota}
+      NODE_RED_ENABLE_PROJECTS: "false"
+      FLOWS: flows.json
+    entrypoint: ["bash", "/usr/local/bin/museo-nodered-entrypoint.sh"]
+    ports:
+      - "${NODERED_HOST_PORT:-1881}:1880"
+    volumes:
+      - nodered_data:/data
+      - ../nodered:/data-import:ro
+      - ../nodered/nodered-entrypoint.sh:/usr/local/bin/museo-nodered-entrypoint.sh:ro
+    networks:
+      - museosmart
+    healthcheck:
+      test: ["CMD", "node", "-e",
+             "require('http').get('http://localhost:1880/',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    image: museosmart-backend:local
+    container_name: museosmart-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mosquitto:
+        condition: service_healthy
+      influxdb:
+        condition: service_healthy
+    environment:
+      SERVER_PORT: 8080
+      TZ: ${TZ:-America/Bogota}
+      # Hostnames internos de la red de Compose (NO localhost).
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-Museo_Smart}
+      DB_USERNAME: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET:?define JWT_SECRET de 32+ caracteres}
+      JWT_EXPIRACION_MINUTOS: ${JWT_EXPIRACION_MINUTOS:-60}
+      MUSEO_SUPERADMIN_EMAIL: ${MUSEO_SUPERADMIN_EMAIL:-}
+      MUSEO_SUPERADMIN_PASSWORD: ${MUSEO_SUPERADMIN_PASSWORD:-}
+      MUSEO_SUPERADMIN_NOMBRE: ${MUSEO_SUPERADMIN_NOMBRE:-SuperAdministrador}
+      MQTT_ENABLED: ${MQTT_ENABLED:-true}
+      MQTT_BROKER_URL: tcp://mosquitto:1883
+      MQTT_USERNAME: ${MQTT_USERNAME}
+      MQTT_PASSWORD: ${MQTT_PASSWORD}
+      INFLUX_ENABLED: ${INFLUX_ENABLED:-true}
+      INFLUX_URL: http://influxdb:8086
+      INFLUX_TOKEN: ${INFLUX_TOKEN}
+      INFLUX_ORG: ${INFLUX_ORG:-museo_smart}
+      INFLUX_BUCKET: ${INFLUX_BUCKET:-museo_smart_ambiental}
+      APP_MAIL_HABILITADO: ${APP_MAIL_HABILITADO:-false}
+      APP_MAIL_FROM: ${APP_MAIL_FROM:-}
+      MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+    ports:
+      # Para Swagger/Actuator desde el host. El frontend lo consume por red interna.
+      - "${BACKEND_HOST_PORT:-8081}:8080"
+    networks:
+      - museosmart
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/actuator/health"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+      start_period: 45s
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: /api/v1
+    image: museosmart-frontend:local
+    container_name: museosmart-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${FRONTEND_HOST_PORT:-8080}:80"
+    networks:
+      - museosmart
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ------------------------------------------------------------
+  # Redis: el compose actual lo incluye, pero NINGÚN componente del
+  # backend lo utiliza (verificado: no hay cliente Redis en pom.xml ni
+  # referencias en el código). Por eso queda COMENTADO para no añadir
+  # un servicio innecesario. Descomente solo si decide usarlo.
+  # ------------------------------------------------------------
+  # redis:
+  #   image: redis:7.4.1
+  #   container_name: museosmart-redis
+  #   restart: unless-stopped
+  #   command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD}"]
+  #   ports:
+  #     - "${REDIS_HOST_PORT:-6380}:6379"
+  #   volumes:
+  #     - redis_data:/data
+  #   networks:
+  #     - museosmart
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+  #     interval: 15s
+  #     timeout: 5s
+  #     retries: 5
+
+volumes:
+  postgres_data:
+    name: museosmart_postgres_data
+  mosquitto_data:
+    name: museosmart_mosquitto_data
+  mosquitto_log:
+    name: museosmart_mosquitto_log
+  nodered_data:
+    name: museosmart_nodered_data
+  influxdb_data:
+    name: museosmart_influxdb_data
+  influxdb_config:
+    name: museosmart_influxdb_config
+  # redis_data:
+  #   name: museosmart_redis_data
+
+networks:
+  museosmart:
+    name: museosmart
+    driver: bridge

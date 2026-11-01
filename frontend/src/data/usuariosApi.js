@@ -8,10 +8,12 @@
 // Endpoints reales del backend (ver UsuarioAdminController):
 //   GET    /api/v1/admin/usuarios -> UsuarioAdminResponse[]
 //   POST   /api/v1/admin/usuarios -> UsuarioAdminResponse (cuerpo UsuarioAdminRequest)
-//   PUT    /api/v1/admin/usuarios/{id} -> UsuarioAdminResponse (nombre, correo, rol)
+//   PUT    /api/v1/admin/usuarios/{id} -> UsuarioAdminResponse (nombre, correo)
 //   PATCH  /api/v1/admin/usuarios/{id}/estado -> UsuarioAdminResponse (estado)
 //   DELETE /api/v1/admin/usuarios/{id} -> 204
 //
+// Modelo fijo: las cuentas gestionadas aquí son siempre ADMIN. El SUPERADMIN
+// único se crea desde el backend y no se edita/desactiva/elimina desde el panel.
 // Requiere rol SUPERADMIN (Spring Security).
 // ============================================================
 import { solicitarAdmin } from './adminApi'
@@ -38,38 +40,31 @@ export function listarUsuarios({ signal } = {}) {
  * @returns {Promise<object>} UsuarioAdminResponse creado
  */
 export function crearUsuario({ nombre, correo, contrasena }, { signal } = {}) {
+  // El rol no se envía: el backend crea siempre cuentas ADMIN.
   return solicitarAdmin('/admin/usuarios', {
     method: 'POST',
-    datos: { nombre, correo, rol: 'ADMIN', contrasena },
+    datos: { nombre, correo, contrasena },
     signal,
   })
 }
 
 /**
- * Actualiza nombre y correo de una cuenta. El backend NO modifica la
- * contraseña ni el rol (el rol solo debe ser válido para pasar la validación
- * del DTO). Por eso se reenvía el rol actual como-etiqueta-backend.
+ * Actualiza nombre y correo de una cuenta ADMIN. El backend no modifica la
+ * contraseña ni el rol; tampoco se envía el rol.
  *
  * @param {number} id
- * @param {{nombre: string, correo: string, rolBackend: string}} datos
+ * @param {{nombre: string, correo: string}} datos
  * @param {{signal?: AbortSignal}} [opciones]
  * @returns {Promise<object>} UsuarioAdminResponse actualizado
  */
-export function actualizarUsuario(id, { nombre, correo, rolBackend }, { signal } = {}) {
+export function actualizarUsuario(id, { nombre, correo }, { signal } = {}) {
   return solicitarAdmin(`/admin/usuarios/${id}`, {
     method: 'PUT',
-    datos: { nombre, correo, rol: rolBackend },
+    datos: { nombre, correo },
     signal,
   })
 }
 
-/**
- * Cambia el estado de una cuenta.
- * @param {number} id
- * @param {'ACTIVO'|'INACTIVO'|'BLOQUEADO'} estado
- * @param {{signal?: AbortSignal}} [opciones]
- * @returns {Promise<object>} UsuarioAdminResponse actualizado
- */
 export function cambiarEstadoUsuario(id, estado, { signal } = {}) {
   return solicitarAdmin(`/admin/usuarios/${id}/estado`, {
     method: 'PATCH',

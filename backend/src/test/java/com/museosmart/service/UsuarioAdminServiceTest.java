@@ -1,6 +1,7 @@
 package com.museosmart.service;
 
 import com.museosmart.entity.UsuarioAdmin;
+import com.museosmart.exception.OperacionProhibidaException;
 import com.museosmart.exception.RecursoNoEncontradoException;
 import com.museosmart.exception.ReglaNegocioException;
 import com.museosmart.repository.UsuarioAdminRepository;
@@ -60,7 +61,7 @@ class UsuarioAdminServiceTest {
         when(usuarioAdminRepository.existsByCorreoIgnoreCase("iny@museo.com")).thenReturn(false);
         when(usuarioAdminRepository.save(any(UsuarioAdmin.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        usuarioAdminService.crear("Inyectado", "iny@museo.com", "ADMIN", "Secreta123");
+        usuarioAdminService.crear("Inyectado", "iny@museo.com", "Secreta123");
 
         verify(passwordEncoder).encode("Secreta123");
     }
@@ -95,7 +96,7 @@ class UsuarioAdminServiceTest {
         when(usuarioAdminRepository.save(any(UsuarioAdmin.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
-        usuarioAdminService.crear("Nuevo Admin", "nuevo@museo.com", "ADMIN", "Secreta123");
+        usuarioAdminService.crear("Nuevo Admin", "nuevo@museo.com", "Secreta123");
 
         ArgumentCaptor<UsuarioAdmin> captor = ArgumentCaptor.forClass(UsuarioAdmin.class);
         verify(usuarioAdminRepository).save(captor.capture());
@@ -113,7 +114,7 @@ class UsuarioAdminServiceTest {
     void crear_rechazaCorreoDuplicado() {
         when(usuarioAdminRepository.existsByCorreoIgnoreCase("dup@museo.com")).thenReturn(true);
 
-        assertThatThrownBy(() -> usuarioAdminService.crear("Dup", "dup@museo.com", "ADMIN", "Secreta123"))
+        assertThatThrownBy(() -> usuarioAdminService.crear("Dup", "dup@museo.com", "Secreta123"))
                 .isInstanceOf(ReglaNegocioException.class)
                 .hasMessageContaining("dup@museo.com");
 
@@ -125,7 +126,7 @@ class UsuarioAdminServiceTest {
     void crear_rechazaCorreoDuplicadoIgnorandoMayusculas() {
         when(usuarioAdminRepository.existsByCorreoIgnoreCase("ADMIN@MUSEO.COM")).thenReturn(true);
 
-        assertThatThrownBy(() -> usuarioAdminService.crear("Dup", "ADMIN@MUSEO.COM", "ADMIN", "Secreta123"))
+        assertThatThrownBy(() -> usuarioAdminService.crear("Dup", "ADMIN@MUSEO.COM", "Secreta123"))
                 .isInstanceOf(ReglaNegocioException.class);
 
         verify(usuarioAdminRepository, never()).save(any(UsuarioAdmin.class));
@@ -138,29 +139,53 @@ class UsuarioAdminServiceTest {
         when(usuarioAdminRepository.save(any(UsuarioAdmin.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
-        UsuarioAdmin resultado = usuarioAdminService.crear("Libre", "libre@museo.com", "ADMIN", "Secreta123");
+        UsuarioAdmin resultado = usuarioAdminService.crear("Libre", "libre@museo.com", "Secreta123");
 
         assertThat(resultado.getCorreo()).isEqualTo("libre@museo.com");
     }
 
     @Test
-    @DisplayName("crear rechaza un rol inválido")
-    void crear_rechazaRolInvalido() {
-        assertThatThrownBy(() -> usuarioAdminService.crear("X", "x@museo.com", "GUIA", "Secreta123"))
+    @DisplayName("crear siempre crea la cuenta con rol ADMIN")
+    void crear_siempreEsAdmin() {
+        when(usuarioAdminRepository.existsByCorreoIgnoreCase("nuevo@museo.com")).thenReturn(false);
+        when(usuarioAdminRepository.save(any(UsuarioAdmin.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        UsuarioAdmin resultado = usuarioAdminService.crear("Nuevo", "nuevo@museo.com", "Secreta123");
+
+        assertThat(resultado.getRol()).isEqualTo("ADMIN");
+    }
+
+    @Test
+    @DisplayName("validarRolNoEscalable acepta vacio y ADMIN")
+    void validarRol_aceptaAdminYVacio() {
+        usuarioAdminService.validarRolNoEscalable(null);
+        usuarioAdminService.validarRolNoEscalable("");
+        usuarioAdminService.validarRolNoEscalable("  ");
+        usuarioAdminService.validarRolNoEscalable("ADMIN");
+        usuarioAdminService.validarRolNoEscalable("admin");
+    }
+
+    @Test
+    @DisplayName("validarRolNoEscalable rechaza SUPERADMIN y otros roles")
+    void validarRol_rechazaSuperAdminYOtros() {
+        assertThatThrownBy(() -> usuarioAdminService.validarRolNoEscalable("SUPERADMIN"))
                 .isInstanceOf(ReglaNegocioException.class)
-                .hasMessageContaining("Rol inválido");
+                .hasMessageContaining("siempre ADMIN");
+        assertThatThrownBy(() -> usuarioAdminService.validarRolNoEscalable("GUIA"))
+                .isInstanceOf(ReglaNegocioException.class);
 
         verifyNoInteractions(usuarioAdminRepository);
     }
 
     @Test
-    @DisplayName("crear rechaza campos obligatorios vacíos o nulos")
+    @DisplayName("crear rechaza campos obligatorios vacios o nulos")
     void crear_rechazaCamposObligatoriosVacios() {
-        assertThatThrownBy(() -> usuarioAdminService.crear("  ", "x@museo.com", "ADMIN", "Secreta123"))
+        assertThatThrownBy(() -> usuarioAdminService.crear("  ", "x@museo.com", "Secreta123"))
                 .isInstanceOf(ReglaNegocioException.class);
-        assertThatThrownBy(() -> usuarioAdminService.crear("X", null, "ADMIN", "Secreta123"))
+        assertThatThrownBy(() -> usuarioAdminService.crear("X", null, "Secreta123"))
                 .isInstanceOf(ReglaNegocioException.class);
-        assertThatThrownBy(() -> usuarioAdminService.crear("X", "x@museo.com", "ADMIN", ""))
+        assertThatThrownBy(() -> usuarioAdminService.crear("X", "x@museo.com", ""))
                 .isInstanceOf(ReglaNegocioException.class);
 
         verifyNoInteractions(usuarioAdminRepository);
@@ -208,6 +233,19 @@ class UsuarioAdminServiceTest {
         assertThatThrownBy(() -> usuarioAdminService.actualizar(3L, "Yo", "ocupado@museo.com"))
                 .isInstanceOf(ReglaNegocioException.class)
                 .hasMessageContaining("ocupado@museo.com");
+
+        verify(usuarioAdminRepository, never()).save(any(UsuarioAdmin.class));
+    }
+
+    @Test
+    @DisplayName("actualizar un SUPERADMIN devuelve OperacionProhibidaException (403)")
+    void actualizar_superAdminProhibido() {
+        UsuarioAdmin superAdmin = admin(1L, "SUPERADMIN", "ACTIVO");
+        when(usuarioAdminRepository.findById(1L)).thenReturn(Optional.of(superAdmin));
+
+        assertThatThrownBy(() -> usuarioAdminService.actualizar(1L, "Otro", "otro@museo.com"))
+                .isInstanceOf(OperacionProhibidaException.class)
+                .hasMessageContaining("SuperAdmin no se puede modificar desde el panel");
 
         verify(usuarioAdminRepository, never()).save(any(UsuarioAdmin.class));
     }
@@ -274,77 +312,22 @@ class UsuarioAdminServiceTest {
     }
 
     @Test
-    @DisplayName("cambiarEstado impide desactivar al último SuperAdmin activo")
-    void cambiarEstado_impideDesactivarUltimoSuperAdmin() {
-        UsuarioAdmin unico = admin(1L, "SUPERADMIN", "ACTIVO");
-        when(usuarioAdminRepository.findById(1L)).thenReturn(Optional.of(unico));
-        when(usuarioAdminRepository.findByRolForUpdate("SUPERADMIN")).thenReturn(List.of(unico));
+    @DisplayName("cambiarEstado sobre un SUPERADMIN devuelve OperacionProhibidaException (403)")
+    void cambiarEstado_superAdminProhibido() {
+        UsuarioAdmin superAdmin = admin(1L, "SUPERADMIN", "ACTIVO");
+        when(usuarioAdminRepository.findById(1L)).thenReturn(Optional.of(superAdmin));
 
         assertThatThrownBy(() -> usuarioAdminService.cambiarEstado(1L, "INACTIVO"))
-                .isInstanceOf(ReglaNegocioException.class)
-                .hasMessageContaining("último SuperAdmin activo");
+                .isInstanceOf(OperacionProhibidaException.class)
+                .hasMessageContaining("SuperAdmin no se puede modificar desde el panel");
 
         verify(usuarioAdminRepository, never()).save(any(UsuarioAdmin.class));
-    }
-
-    @Test
-    @DisplayName("cambiarEstado impide bloquear al último SuperAdmin activo")
-    void cambiarEstado_impideBloquearUltimoSuperAdmin() {
-        UsuarioAdmin unico = admin(1L, "SUPERADMIN", "ACTIVO");
-        when(usuarioAdminRepository.findById(1L)).thenReturn(Optional.of(unico));
-        when(usuarioAdminRepository.findByRolForUpdate("SUPERADMIN")).thenReturn(List.of(unico));
-
-        assertThatThrownBy(() -> usuarioAdminService.cambiarEstado(1L, "BLOQUEADO"))
-                .isInstanceOf(ReglaNegocioException.class)
-                .hasMessageContaining("último SuperAdmin activo");
-
-        verify(usuarioAdminRepository, never()).save(any(UsuarioAdmin.class));
-    }
-
-    @Test
-    @DisplayName("cambiarEstado usa el bloqueo pesimista antes de decidir sobre un SuperAdmin")
-    void cambiarEstado_usaBloqueoPesimistaParaSuperAdmin() {
-        UsuarioAdmin unico = admin(1L, "SUPERADMIN", "ACTIVO");
-        when(usuarioAdminRepository.findById(1L)).thenReturn(Optional.of(unico));
-        when(usuarioAdminRepository.findByRolForUpdate("SUPERADMIN")).thenReturn(List.of(unico));
-
-        assertThatThrownBy(() -> usuarioAdminService.cambiarEstado(1L, "INACTIVO"))
-                .isInstanceOf(ReglaNegocioException.class);
-
-        verify(usuarioAdminRepository).findByRolForUpdate("SUPERADMIN");
-    }
-
-    @Test
-    @DisplayName("cambiarEstado a ACTIVO no consulta el bloqueo de SuperAdmin")
-    void cambiarEstado_aActivoNoBloquea() {
-        UsuarioAdmin unico = admin(1L, "SUPERADMIN", "INACTIVO");
-        when(usuarioAdminRepository.findById(1L)).thenReturn(Optional.of(unico));
-        when(usuarioAdminRepository.save(any(UsuarioAdmin.class))).thenAnswer(inv -> inv.getArgument(0));
-
-        UsuarioAdmin resultado = usuarioAdminService.cambiarEstado(1L, "ACTIVO");
-
-        assertThat(resultado.getEstado()).isEqualTo("ACTIVO");
-        verify(usuarioAdminRepository, never()).findByRolForUpdate(anyString());
-    }
-
-    @Test
-    @DisplayName("cambiarEstado permite desactivar un SuperAdmin si existe otro activo")
-    void cambiarEstado_permiteDesactivarSuperAdminConOtroActivo() {
-        UsuarioAdmin objetivo = admin(1L, "SUPERADMIN", "ACTIVO");
-        UsuarioAdmin otro = admin(2L, "SUPERADMIN", "ACTIVO");
-        when(usuarioAdminRepository.findById(1L)).thenReturn(Optional.of(objetivo));
-        when(usuarioAdminRepository.findByRolForUpdate("SUPERADMIN")).thenReturn(List.of(objetivo, otro));
-        when(usuarioAdminRepository.save(any(UsuarioAdmin.class))).thenAnswer(inv -> inv.getArgument(0));
-
-        UsuarioAdmin resultado = usuarioAdminService.cambiarEstado(1L, "INACTIVO");
-
-        assertThat(resultado.getEstado()).isEqualTo("INACTIVO");
     }
 
     // ---------- Eliminar ----------
 
     @Test
-    @DisplayName("eliminar borra un administrador no SuperAdmin")
+    @DisplayName("eliminar borra un administrador normal (ADMIN)")
     void eliminar_borraAdminNormal() {
         UsuarioAdmin adminNormal = admin(8L, "ADMIN", "ACTIVO");
         when(usuarioAdminRepository.findById(8L)).thenReturn(Optional.of(adminNormal));
@@ -355,30 +338,16 @@ class UsuarioAdminServiceTest {
     }
 
     @Test
-    @DisplayName("eliminar impide borrar al último SuperAdmin activo")
-    void eliminar_impideBorrarUltimoSuperAdmin() {
-        UsuarioAdmin unico = admin(1L, "SUPERADMIN", "ACTIVO");
-        when(usuarioAdminRepository.findById(1L)).thenReturn(Optional.of(unico));
-        when(usuarioAdminRepository.findByRolForUpdate("SUPERADMIN")).thenReturn(List.of(unico));
+    @DisplayName("eliminar un SUPERADMIN devuelve OperacionProhibidaException (403)")
+    void eliminar_superAdminProhibido() {
+        UsuarioAdmin superAdmin = admin(1L, "SUPERADMIN", "ACTIVO");
+        when(usuarioAdminRepository.findById(1L)).thenReturn(Optional.of(superAdmin));
 
         assertThatThrownBy(() -> usuarioAdminService.eliminar(1L))
-                .isInstanceOf(ReglaNegocioException.class)
-                .hasMessageContaining("último SuperAdmin activo");
+                .isInstanceOf(OperacionProhibidaException.class)
+                .hasMessageContaining("SuperAdmin no se puede modificar desde el panel");
 
         verify(usuarioAdminRepository, never()).delete(any(UsuarioAdmin.class));
-    }
-
-    @Test
-    @DisplayName("eliminar permite borrar un SuperAdmin si otro sigue activo")
-    void eliminar_permiteBorrarSuperAdminConOtroActivo() {
-        UsuarioAdmin objetivo = admin(1L, "SUPERADMIN", "ACTIVO");
-        UsuarioAdmin otro = admin(2L, "SUPERADMIN", "ACTIVO");
-        when(usuarioAdminRepository.findById(1L)).thenReturn(Optional.of(objetivo));
-        when(usuarioAdminRepository.findByRolForUpdate("SUPERADMIN")).thenReturn(List.of(objetivo, otro));
-
-        usuarioAdminService.eliminar(1L);
-
-        verify(usuarioAdminRepository).delete(objetivo);
     }
 
     @Test
@@ -389,7 +358,6 @@ class UsuarioAdminServiceTest {
         assertThatThrownBy(() -> usuarioAdminService.eliminar(55L))
                 .isInstanceOf(RecursoNoEncontradoException.class);
     }
-
     private UsuarioAdmin admin(Long id, String rol, String estado) {
         UsuarioAdmin u = new UsuarioAdmin();
         setField(u, "id", id);
