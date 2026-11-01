@@ -1,0 +1,120 @@
+/* =============================================================================
+   Componente Paginacion
+   Estilo consistente con el diseño de Museo_Smart:
+   - Botones redondeados de 28x28px
+   - Estado activo en dorado/marrón (#9e742e)
+   - Contenedor con flex-wrap: nowrap que previene desbordamiento horizontal
+   - Modo compacto en < 640px ("‹ Página X de Y ›")
+============================================================================= */
+
+.paginacion {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+  min-width: 0;
+  user-select: none;
+}
+
+.paginacion__numeros {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+
+.paginacion__btn {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  padding: 0;
+  border-radius: 6px;
+  border: 1px solid rgba(33, 25, 15, 0.12);
+  background: #ffffff;
+  color: #4a4237;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.paginacion__btn:hover:not(:disabled):not(.paginacion__btn--activo) {
+  border-color: #c6a15b;
+  color: #1a1714;
+  background: rgba(198, 161, 91, 0.08);
+}
+
+.paginacion__btn--activo {
+  background: #9e742e;
+  border-color: #9e742e;
+  color: #ffffff;
+  font-weight: 600;
+  cursor: default;
+}
+
+.paginacion__btn--activo:hover {
+  background: #8e6828;
+  border-color: #8e6828;
+  color: #ffffff;
+}
+
+.paginacion__btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  border-color: rgba(33, 25, 15, 0.08);
+  background: #faf8f5;
+  color: #9c9387;
+}
+
+.paginacion__btn--flecha {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.paginacion__elipsis {
+  width: 20px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #8c8273;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* En pantallas amplias, el resumen textual móvil se oculta */
+.paginacion__resumen-movil {
+  display: none;
+}
+
+/* =============================================================================
+   Pantallas angostas (< 640px)
+   Oculta los números y muestra únicamente: "‹ Página X de Y ›"
+============================================================================= */
+@media (max-width: 639px) {
+  .paginacion__numeros {
+    display: none;
+  }
+
+  .paginacion__resumen-movil {
+    display: inline-flex;
+    align-items: center;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #4a4237;
+    white-space: nowrap;
+    padding: 0 4px;
+    letter-spacing: 0.01em;
+  }
+}

@@ -94,7 +94,7 @@ separados en el código:
 - **No hay** WebSockets, SSE ni colas de mensajes. El panel refresca solo al
   montar cada vista o con acciones del usuario.
 - **No hay** CORS configurado: el frontend debe servirse en el mismo origen que
-  la API o usar el proxy de Vite (desarrollo) / un proxy inverso (producción).
+  la API o usar el proxy de Vite (desarrollo, con `/api` y `/media`) / un proxy inverso en producción (Caddy, Nginx reenviando `/api` y `/media` al backend con límite de hasta 55 MB para subidas multimedia).
 
 ### 2.1 Tecnologías y versiones
 

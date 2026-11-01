@@ -25,9 +25,9 @@ import {
 } from '../data/museo3d'
 import { listarTodasExhibicionesPublicas } from '../data/exhibicionesPublicasApi'
 import { registrarVisita, FUENTE_CURSOR } from '../data/popularidadPublicaApi'
-import { urlMedia } from '../data/exhibicionesApi'
-import { primeraVista, verMas, valorReal, exhibicionMostrable } from '../data/fichaExhibicion'
+import { primeraVista, exhibicionMostrable } from '../data/fichaExhibicion'
 import { obtenerSesionAnonima } from '../data/sesionAnonima'
+import FichaVisitante from './FichaVisitante'
 import './RecorridoMuseo.css'
 
 const MAX_PITCH = Math.PI / 2 - 0.08
@@ -558,90 +558,16 @@ function VistaPreviaPieza({ exhibicion }) {
   )
 }
 
-// Fila de dato: se renderiza solo si hay valor real.
-function Campo({ etiqueta, valor }) {
-  const texto = valorReal(valor)
-  if (!texto) return null
-  return (
-    <div className="recorrido__campo">
-      <span className="recorrido__campo-etiqueta">{etiqueta}</span>
-      <span className="recorrido__campo-valor">{texto}</span>
-    </div>
-  )
-}
 
-// Ficha ampliada: primera vista + "Ver más" con categoría, materiales,
-// descripción completa, dato curioso y video.
+// Ficha ampliada del visitante (reemplazada por FichaVisitante reutilizable).
 function FichaPieza({ exhibicion, errorDatos, onCerrar }) {
-  const [verTodo, setVerTodo] = useState(false)
-  const mostrable = exhibicionMostrable(exhibicion)
-  const vista = primeraVista(exhibicion)
-  const camposMas = verMas(exhibicion)
-  const imagen = exhibicion?.imagenUrl ? urlMedia(exhibicion.imagenUrl) : null
-  const video = exhibicion?.videoUrl ? urlMedia(exhibicion.videoUrl) : null
-  const titulo = mostrable ? vista.titulo : 'Obra sin ficha publicada'
-  const sinDatos = !mostrable
-
   return (
-    <div className="recorrido__ficha-ampliada" role="dialog" aria-modal="false" aria-label={titulo}>
-      <button type="button" className="recorrido__ficha-cerrar" onClick={onCerrar} aria-label="Cerrar ficha">
-        ×
-      </button>
-
-      <div className="recorrido__ficha-contenido">
-        {imagen ? (
-          <img className="recorrido__ficha-imagen" src={imagen} alt={titulo} />
-        ) : (
-          <div className="recorrido__ficha-imagen recorrido__ficha-imagen--vacia">Falta imagen</div>
-        )}
-
-        {vista?.sala && <span className="recorrido__ficha-sala-cabecera">{vista.sala}</span>}
-        <h3 className="recorrido__ficha-titulo">{titulo}</h3>
-
-        {mostrable && (
-          <>
-            {vista.procedencia && <p className="recorrido__ficha-procedencia">{vista.procedencia}</p>}
-            {vista.descripcionCorta && (
-              <p className="recorrido__ficha-corta">{vista.descripcionCorta}</p>
-            )}
-
-            {verTodo && (
-              <>
-                {camposMas.map((campo) => (
-                  <Campo key={campo.etiqueta} etiqueta={campo.etiqueta} valor={campo.valor} />
-                ))}
-                {video && (
-                  <video className="recorrido__ficha-video" src={video} controls preload="metadata" />
-                )}
-              </>
-            )}
-
-            {(camposMas.length > 0 || video) && (
-              <button type="button" className="recorrido__ficha-vermas" onClick={() => setVerTodo((v) => !v)}>
-                {verTodo ? 'Ver menos' : 'Ver más'}
-              </button>
-            )}
-          </>
-        )}
-
-        {sinDatos && (
-          <p className="recorrido__ficha-aviso">
-            Ficha en preparación: la información de esta obra se irá publicando
-            a medida que se confirme su contenido.
-          </p>
-        )}
-
-        {errorDatos && !sinDatos && (
-          <p className="recorrido__ficha-aviso recorrido__ficha-aviso--error">
-            No se pudieron cargar todos los datos de la exhibición.
-          </p>
-        )}
-      </div>
-
-      <button type="button" className="recorrido__ficha-accion" onClick={onCerrar}>
-        Cerrar
-      </button>
-    </div>
+    <FichaVisitante
+      exhibicion={exhibicion}
+      errorDatos={errorDatos}
+      onCerrar={onCerrar}
+      modo="recorrido"
+    />
   )
 }
 export default function RecorridoMuseo() {

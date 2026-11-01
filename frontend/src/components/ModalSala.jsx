@@ -3,8 +3,8 @@ import { listarExhibicionesPublicas } from '../data/exhibicionesPublicasApi'
 import { registrarVisita } from '../data/popularidadPublicaApi'
 import { obtenerSesionAnonima } from '../data/sesionAnonima'
 import { urlMedia } from '../data/exhibicionesApi'
-import { primeraVista, verMas } from '../data/fichaExhibicion'
 import { ErrorHttp } from '../data/httpClient'
+import FichaVisitante from './FichaVisitante'
 
 function mensajeDeError(error, porDefecto) {
   if (error instanceof ErrorHttp) {
@@ -14,41 +14,6 @@ function mensajeDeError(error, porDefecto) {
     return error.message || porDefecto
   }
   return porDefecto
-}
-
-// "Ver más" de la ficha: categoría, materiales, descripción completa, dato
-// curioso y video. Solo se muestran los campos que existen.
-function FichaVerMas({ exhibicion }) {
-  const [abierto, setAbierto] = useState(false)
-  const campos = verMas(exhibicion)
-  const video = exhibicion?.videoUrl ? urlMedia(exhibicion.videoUrl) : null
-  if (campos.length === 0 && !video) return null
-
-  return (
-    <div className="modal-exhibicion__mas">
-      <button
-        type="button"
-        className="modal-exhibicion__vermas"
-        onClick={() => setAbierto((v) => !v)}
-        aria-expanded={abierto}
-      >
-        {abierto ? 'Ver menos' : 'Ver más'}
-      </button>
-      {abierto && (
-        <>
-          {campos.map((campo) => (
-            <div className="modal-exhibicion__campo" key={campo.etiqueta}>
-              <span className="modal-exhibicion__campo-etq">{campo.etiqueta}</span>
-              <span className="modal-exhibicion__campo-val">{campo.valor}</span>
-            </div>
-          ))}
-          {video && (
-            <video className="modal-exhibicion__video" src={video} controls preload="metadata" />
-          )}
-        </>
-      )}
-    </div>
-  )
 }
 export default function ModalSala({ sala, onCerrar }) {
   const cerrarRef = useRef(null)
@@ -151,34 +116,14 @@ export default function ModalSala({ sala, onCerrar }) {
 
           {seleccionada ? (
             <div className="modal-exhibicion">
-              {seleccionada.imagenUrl ? (
-                <img
-                  className="modal-exhibicion__imagen"
-                  src={urlMedia(seleccionada.imagenUrl)}
-                  alt={seleccionada.titulo}
-                />
-              ) : (
-                <div className="modal-exhibicion__imagen modal-exhibicion__imagen--vacia">
-                  Falta imagen
-                </div>
-              )}
-              <h4 className="modal-exhibicion__titulo">{primeraVista(seleccionada)?.titulo}</h4>
-              {primeraVista(seleccionada)?.procedencia && (
-                <p className="modal-exhibicion__procedencia">
-                  {primeraVista(seleccionada).procedencia}
-                </p>
-              )}
-              <span className="modal-exhibicion__sala">
-                {primeraVista(seleccionada)?.sala}
-              </span>
-              {primeraVista(seleccionada)?.descripcionCorta && (
-                <p className="modal-exhibicion__descripcion">
-                  {primeraVista(seleccionada).descripcionCorta}
-                </p>
-              )}
-
-              <FichaVerMas exhibicion={seleccionada} />
-
+              <FichaVisitante
+                exhibicion={{
+                  ...seleccionada,
+                  salaNombre: sala.nombre,
+                }}
+                onCerrar={() => setSeleccionada(null)}
+                modo="modal"
+              />
               <button
                 type="button"
                 className="modal__accion"

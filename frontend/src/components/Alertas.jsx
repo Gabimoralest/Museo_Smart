@@ -9,6 +9,7 @@ import {
 } from './iconos'
 import { listarAlertas, resolverAlerta } from '../data/alertasApi'
 import { ErrorHttp } from '../data/httpClient'
+import Paginacion from './Paginacion'
 import './Alertas.css'
 
 // ------------------------------------------------------------------
@@ -448,34 +449,11 @@ export default function Alertas() {
               {alertasFiltradas.length} alertas
             </span>
 
-            <div className="alertas-paginacion__controles">
-              <button
-                type="button"
-                className="alertas-btn-pag"
-                disabled={paginaActual === 1}
-                onClick={() => setPaginaActual((p) => Math.max(1, p - 1))}
-              >
-                &lt;
-              </button>
-              {Array.from({ length: totalPaginas }, (_, i) => i + 1).map((num) => (
-                <button
-                  type="button"
-                  key={num}
-                  className={`alertas-btn-pag${paginaActual === num ? ' alertas-btn-pag--activo' : ''}`}
-                  onClick={() => setPaginaActual(num)}
-                >
-                  {num}
-                </button>
-              ))}
-              <button
-                type="button"
-                className="alertas-btn-pag"
-                disabled={paginaActual === totalPaginas}
-                onClick={() => setPaginaActual((p) => Math.min(totalPaginas, p + 1))}
-              >
-                &gt;
-              </button>
-            </div>
+            <Paginacion
+              paginaActual={paginaActual}
+              totalPaginas={totalPaginas}
+              onCambiar={setPaginaActual}
+            />
 
             <div className="alertas-paginacion__por-pag">
               <span>Mostrar 10 por página</span>

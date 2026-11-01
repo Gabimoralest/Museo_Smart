@@ -72,23 +72,104 @@
 
 .gestion-exh__cabecera {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.gestion-exh__cabecera-principal {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.gestion-exh__cabecera-icono {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: #fbf5eb;
+  color: #9e742e;
+  border: 1px solid rgba(198, 161, 91, 0.28);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.gestion-exh__cabecera-icono svg {
+  width: 24px;
+  height: 24px;
+}
+
+.gestion-exh__cabecera-textos {
+  display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 3px;
+  min-width: 0;
 }
 
 .gestion-exh__titulo {
-  font-family: var(--fuente-titulo);
-  font-size: clamp(26px, 2.5vw, 34px);
+  font-family: var(--fuente-titulo, 'Cinzel', serif);
+  font-size: clamp(22px, 2.2vw, 30px);
   font-weight: 700;
   color: #1a1714;
   letter-spacing: -0.3px;
-  line-height: 1.15;
+  line-height: 1.2;
+  margin: 0;
 }
 
 .gestion-exh__subtitulo {
-  font-size: 14.5px;
-  color: #6e675d;
+  font-size: 13.5px;
+  color: #70675a;
   line-height: 1.4;
+  margin: 0;
+}
+
+.gestion-exh__btn-actualizar {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 10px;
+  border: 1px solid rgba(158, 116, 46, 0.35);
+  background: #9e742e;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(158, 116, 46, 0.2);
+}
+
+.gestion-exh__btn-actualizar:hover:not(:disabled) {
+  background: #876223;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(158, 116, 46, 0.3);
+}
+
+.gestion-exh__btn-actualizar:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.gestion-exh__btn-actualizar svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+.is-spinning {
+  animation: girar 1s linear infinite;
+}
+
+@keyframes girar {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* ===================== Tarjetas de resumen ===================== */
@@ -394,7 +475,7 @@
 
 .gestion-exh__cuadricula {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 18px;
 }
 
@@ -404,22 +485,24 @@
   flex-direction: column;
   background: #ffffff;
   border: 1px solid rgba(33, 25, 15, 0.08);
-  border-radius: 12px;
+  border-radius: 14px;
   overflow: hidden;
   box-shadow: 0 2px 10px rgba(33, 25, 15, 0.03);
-  transition: transform 0.22s ease, box-shadow 0.22s ease;
+  transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+  min-width: 0;
 }
 
 .tarjeta-exh:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 22px rgba(33, 25, 15, 0.07);
+  box-shadow: 0 8px 24px rgba(33, 25, 15, 0.07);
+  border-color: rgba(198, 161, 91, 0.35);
 }
 
 /* Contenedor de imagen */
 .tarjeta-exh__imagen-contenedor {
   position: relative;
   width: 100%;
-  height: 148px;
+  height: 155px;
   background: #21190f;
   overflow: hidden;
 }
@@ -429,13 +512,42 @@
   height: 100%;
   object-fit: cover;
   transition: transform 0.35s ease;
+  display: block;
 }
 
 .tarjeta-exh:hover .tarjeta-exh__imagen {
   transform: scale(1.025);
 }
 
-/* Badge flotante */
+/* Marcador discreto y neutro sin imagen */
+.tarjeta-exh__marcador {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: #f5ede1;
+  color: #8c7e6d;
+  user-select: none;
+}
+
+.tarjeta-exh__marcador-icono {
+  width: 24px;
+  height: 24px;
+  opacity: 0.55;
+  color: #8c7e6d;
+}
+
+.tarjeta-exh__marcador-texto {
+  font-size: 12px;
+  font-weight: 600;
+  color: #7d7162;
+  letter-spacing: 0.01em;
+}
+
+/* Badge flotante de estado */
 .tarjeta-exh__badge {
   position: absolute;
   top: 9px;
@@ -447,9 +559,11 @@
   border-radius: 999px;
   font-size: 11px;
   font-weight: 600;
-  backdrop-filter: blur(6px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.16);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
   pointer-events: none;
+  z-index: 2;
+  user-select: none;
 }
 
 .tarjeta-exh__badge-punto {
@@ -460,7 +574,7 @@
 }
 
 .tarjeta-exh__badge--activa {
-  background: rgba(235, 248, 239, 0.94);
+  background: rgba(235, 248, 239, 0.95);
   color: #1f7a37;
   border: 1px solid rgba(31, 122, 55, 0.25);
 }
@@ -470,7 +584,7 @@
 }
 
 .tarjeta-exh__badge--inactiva {
-  background: rgba(254, 238, 238, 0.94);
+  background: rgba(254, 238, 238, 0.95);
   color: #c92a2a;
   border: 1px solid rgba(201, 42, 42, 0.25);
 }
@@ -483,8 +597,9 @@
 .tarjeta-exh__cuerpo {
   display: flex;
   flex-direction: column;
-  padding: 15px 16px 16px;
+  padding: 14px 16px 16px;
   flex: 1;
+  min-width: 0;
 }
 
 .tarjeta-exh__nombre {
@@ -492,27 +607,53 @@
   font-weight: 700;
   color: #1c1a17;
   line-height: 1.25;
-  font-family: var(--fuente);
-}
-
-.tarjeta-exh__subtitulo {
-  font-size: 12px;
-  color: #7d766b;
-  margin-top: 3px;
-  font-weight: 500;
-}
-
-.tarjeta-exh__descripcion {
-  font-size: 12px;
-  color: #554f46;
-  line-height: 1.45;
-  margin-top: 8px;
-  margin-bottom: 14px;
-  flex: 1;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
+  font-family: var(--fuente, inherit);
+  margin: 0;
+  white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+/* Detalles: categoría y sala */
+.tarjeta-exh__detalles {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+  margin-bottom: 14px;
+  min-width: 0;
+}
+
+.tarjeta-exh__detalle-fila {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: #6e6558;
+  line-height: 1.2;
+  min-width: 0;
+}
+
+.tarjeta-exh__detalle-icono {
+  width: 15px;
+  height: 15px;
+  color: #9e742e;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+}
+
+.tarjeta-exh__detalle-icono svg {
+  width: 100%;
+  height: 100%;
+}
+
+.tarjeta-exh__detalle-texto {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 /* Control de disponibilidad */
@@ -816,9 +957,10 @@
 
 /* ===================== Diseño adaptable ===================== */
 
-@media (max-width: 1200px) {
+@media (max-width: 1100px) {
   .gestion-exh__cuadricula {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
   }
 
   .gestion-exh__resumen {
@@ -840,13 +982,22 @@
     width: 100%;
     justify-content: flex-start;
   }
+}
 
+@media (max-width: 640px) {
   .gestion-exh__cuadricula {
     grid-template-columns: 1fr;
+    gap: 14px;
   }
 
-  .gestion-exh__resumen {
-    grid-template-columns: 1fr 1fr;
+  .gestion-exh__cabecera {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .gestion-exh__btn-actualizar {
+    width: 100%;
+    justify-content: center;
   }
 }
 
@@ -868,6 +1019,11 @@
   .menu-desplegable__lista {
     width: 100%;
   }
+
+  .gestion-exh__filtro-rapido {
+    width: 100%;
+    justify-content: center;
+  }
 }
 
 /* ============================================================
@@ -882,36 +1038,41 @@
 
 .tarjeta-exh__acciones {
   display: flex;
-  gap: 8px;
-  margin-top: 12px;
-  flex-wrap: wrap;
+  width: 100%;
+  margin-top: auto;
+  padding-top: 4px;
 }
 
 .boton-exh {
-  flex: 1 1 auto;
-  padding: 8px 12px;
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 8.5px 14px;
   border-radius: 8px;
-  border: 1px solid rgba(198, 161, 91, 0.55);
-  background: #fff;
-  color: #4a3a22;
-  font-size: 0.85rem;
+  border: 1px solid rgba(198, 161, 91, 0.45);
+  background: #fffcf8;
+  color: #3d3324;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: all 0.18s ease;
+  box-sizing: border-box;
 }
 
-.boton-exh:hover {
-  background: rgba(198, 161, 91, 0.14);
-}
-
-.boton-exh--editar {
-  background: #c6a15b;
-  border-color: #c6a15b;
-  color: #1f1a14;
+.boton-exh svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
 }
 
 .boton-exh--editar:hover {
-  background: #b8934d;
+  background: #9e742e;
+  border-color: #9e742e;
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(158, 116, 46, 0.2);
 }
 
 .modal-edit__campo {
@@ -1024,48 +1185,44 @@
 }
 
 /* ============================================================
-   Listado: marcador de imagen y filtro rapido
+   Filtro rápido "Sin imagen"
    ============================================================ */
-.tarjeta-exh__marcador {
-  width: 100%;
-  height: 100%;
-  min-height: 160px;
-  display: grid;
-  place-items: center;
-  background: #efe8dc;
-  color: #8a7a63;
-}
-
-.tarjeta-exh__marcador-texto {
-  font-size: 0.85rem;
-  font-style: italic;
-}
-
-.tarjeta-exh__badge-imagen {
-  position: absolute;
-  left: 10px;
-  bottom: 10px;
-  background: rgba(192, 57, 43, 0.9);
-  color: #fff;
-  font-size: 0.7rem;
-  font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 999px;
-}
-
 .gestion-exh__filtro-rapido {
-  padding: 9px 14px;
-  border-radius: 8px;
-  border: 1px solid rgba(198, 161, 91, 0.5);
-  background: #fff;
-  color: #4a3a22;
-  font-size: 0.85rem;
-  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(33, 25, 15, 0.12);
+  background: #ffffff;
+  color: #23201c;
+  font-size: 13.5px;
+  font-weight: 500;
   cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+  white-space: nowrap;
+}
+
+.gestion-exh__filtro-rapido:hover {
+  border-color: #c6a15b;
+  background: #fcfbf9;
 }
 
 .gestion-exh__filtro-rapido.is-activo {
-  background: #c6a15b;
-  border-color: #c6a15b;
-  color: #1f1a14;
+  border-color: #b58d4a;
+  background: #fbf7ee;
+  color: #8c6729;
+  font-weight: 600;
+}
+
+.gestion-exh__filtro-rapido-icono {
+  width: 17px;
+  height: 17px;
+  color: #8a8377;
+  flex-shrink: 0;
+}
+
+.gestion-exh__filtro-rapido.is-activo .gestion-exh__filtro-rapido-icono {
+  color: #8c6729;
 }

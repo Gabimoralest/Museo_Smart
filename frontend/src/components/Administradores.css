@@ -468,46 +468,18 @@
 }
 
 .admin-paginacion__conteo,
-.admin-paginacion__controles,
 .admin-paginacion__por-pag {
   min-width: 0;
+  white-space: nowrap;
 }
 
-.admin-paginacion__controles {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.admin-btn-pag {
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  border: 1px solid rgba(33, 25, 15, 0.12);
-  background: #ffffff;
-  color: #4a4237;
-  font-size: 12px;
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.admin-btn-pag:hover:not(:disabled) {
-  border-color: #c6a15b;
-  color: #1a1714;
-}
-
-.admin-btn-pag--activo {
-  background: #9e742e;
-  border-color: #9e742e;
-  color: #ffffff;
-  font-weight: 600;
-}
-
-.admin-btn-pag:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
+@media (max-width: 639px) {
+  .admin-paginacion {
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    text-align: center;
+  }
 }
 
 /* ===================== Panel Lateral: Detalle del Administrador ===================== */

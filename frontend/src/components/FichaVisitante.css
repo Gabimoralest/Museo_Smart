@@ -1,0 +1,375 @@
+/* ============================================================
+   Ficha del visitante — Museo Smart
+   Componente unificado para Recorrido 3D, ModalSala y Vista Previa
+   ============================================================ */
+
+.ficha-visitante {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  background: rgba(20, 24, 30, 0.96);
+  border: 1px solid var(--color-borde);
+  border-radius: 14px;
+  box-shadow: 0 16px 36px -12px rgba(0, 0, 0, 0.7);
+  color: var(--color-texto);
+  font-family: var(--fuente);
+  overflow: hidden;
+}
+
+/* Modos de visualización */
+.ficha-visitante--recorrido {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  width: min(390px, calc(100% - 32px));
+  max-height: calc(100% - 48px);
+  z-index: 50;
+  backdrop-filter: blur(12px);
+}
+
+@media (max-width: 768px) {
+  .ficha-visitante--recorrido {
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    max-height: 75vh;
+    border-radius: 16px 16px 0 0;
+    border-bottom: none;
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.6);
+  }
+}
+
+.ficha-visitante--vista-previa {
+  width: 100%;
+  max-height: 480px;
+  border-color: rgba(198, 161, 91, 0.28);
+  background: #14181e;
+}
+
+.ficha-visitante--modal {
+  width: 100%;
+  margin-top: 16px;
+  max-height: 520px;
+  background: var(--color-superficie);
+}
+
+/* Botón cerrar */
+.ficha-visitante__cerrar {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 10;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(10, 13, 17, 0.75);
+  border: 1px solid var(--color-borde);
+  color: var(--color-crema);
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.15s ease, border-color 0.2s ease;
+}
+
+.ficha-visitante__cerrar svg {
+  width: 16px;
+  height: 16px;
+}
+
+.ficha-visitante__cerrar:hover,
+.ficha-visitante__cerrar:focus-visible {
+  background: rgba(214, 178, 106, 0.25);
+  border-color: var(--color-oro);
+  transform: scale(1.05);
+}
+
+/* ============================================================
+   Carrusel multimedia (máx. 2 elementos)
+   ============================================================ */
+
+.ficha-visitante__carrusel {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  min-height: 200px;
+  background: #090c0f;
+  overflow: hidden;
+  outline: none;
+}
+
+.ficha-visitante__carrusel:focus-visible {
+  outline: 2px solid var(--color-oro);
+  outline-offset: -2px;
+}
+
+.ficha-visitante__medios-marco {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.ficha-visitante__slide {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.25s ease-in-out, visibility 0.25s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ficha-visitante__slide.is-activo {
+  opacity: 1;
+  visibility: visible;
+  z-index: 1;
+}
+
+.ficha-visitante__imagen {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.ficha-visitante__video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+
+.ficha-visitante__placeholder-media {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #1b2029 0%, #10141a 100%);
+  color: var(--color-texto-tenue);
+  font-size: 0.9rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+/* Flechas del carrusel */
+.ficha-visitante__carrusel-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 5;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(13, 16, 20, 0.7);
+  color: var(--color-crema);
+  font-size: 22px;
+  line-height: 1;
+  border: 1px solid rgba(214, 178, 106, 0.35);
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+  user-select: none;
+}
+
+.ficha-visitante__carrusel-btn:hover,
+.ficha-visitante__carrusel-btn:focus-visible {
+  background: rgba(214, 178, 106, 0.3);
+  border-color: var(--color-oro);
+}
+
+.ficha-visitante__carrusel-btn--prev {
+  left: 10px;
+}
+
+.ficha-visitante__carrusel-btn--next {
+  right: 10px;
+}
+
+/* Puntos indicadores */
+.ficha-visitante__puntos {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(10, 13, 17, 0.6);
+  backdrop-filter: blur(4px);
+}
+
+.ficha-visitante__punto {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(233, 230, 223, 0.4);
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.ficha-visitante__punto.is-activo {
+  background: var(--color-oro);
+  transform: scale(1.25);
+}
+
+/* ============================================================
+   Cuerpo con scroll interno
+   ============================================================ */
+
+.ficha-visitante__cuerpo {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px 20px 20px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(214, 178, 106, 0.3) transparent;
+}
+
+.ficha-visitante__cuerpo::-webkit-scrollbar {
+  width: 6px;
+}
+
+.ficha-visitante__cuerpo::-webkit-scrollbar-thumb {
+  background: rgba(214, 178, 106, 0.3);
+  border-radius: 3px;
+}
+
+/* Título */
+.ficha-visitante__titulo {
+  margin: 0;
+  font-family: var(--fuente-titulo);
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: var(--color-crema);
+  line-height: 1.25;
+}
+
+/* Cultura o procedencia · Época */
+.ficha-visitante__procedencia {
+  margin: -4px 0 0;
+  font-size: 0.88rem;
+  color: var(--color-oro-claro);
+  font-weight: 500;
+}
+
+/* Sala · Categoría (ej. "Plaza central · Exhibición especial") */
+.ficha-visitante__sala-cat {
+  margin: 0;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-oro);
+  font-weight: 600;
+}
+
+/* Descripción corta */
+.ficha-visitante__descripcion-corta {
+  margin: 2px 0 0;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: var(--color-texto);
+}
+
+/* Sección descripción completa */
+.ficha-visitante__seccion-texto {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(214, 178, 106, 0.15);
+}
+
+.ficha-visitante__subtitulo {
+  margin: 0;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-texto-tenue);
+  font-weight: 600;
+}
+
+.ficha-visitante__descripcion-completa {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: var(--color-texto);
+  white-space: pre-line;
+}
+
+/* Materiales */
+.ficha-visitante__campo {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 0.86rem;
+  color: var(--color-texto);
+  margin-top: 2px;
+}
+
+.ficha-visitante__campo-etiqueta {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-texto-tenue);
+  font-weight: 600;
+}
+
+.ficha-visitante__campo-valor {
+  font-weight: 500;
+}
+
+/* Recuadro destacado: Dato curioso */
+.ficha-visitante__dato-curioso {
+  margin-top: 6px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: rgba(214, 178, 106, 0.08);
+  border: 1px solid rgba(214, 178, 106, 0.25);
+  border-left: 3px solid var(--color-oro);
+}
+
+.ficha-visitante__dato-curioso-titulo {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-oro-claro);
+  margin-bottom: 4px;
+}
+
+.ficha-visitante__dato-curioso-texto {
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.45;
+  color: var(--color-crema);
+  font-style: italic;
+}
+
+/* Avisos informativos */
+.ficha-visitante__aviso {
+  margin-top: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  background: rgba(214, 178, 106, 0.1);
+  color: var(--color-oro-claro);
+}
+
+.ficha-visitante__aviso--error {
+  background: rgba(231, 111, 81, 0.15);
+  color: #f4a261;
+}

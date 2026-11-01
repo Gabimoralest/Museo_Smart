@@ -19,6 +19,7 @@ import {
 } from '../data/monitoreoApi'
 import { listarAlertas } from '../data/alertasApi'
 import { ErrorHttp } from '../data/httpClient'
+import Paginacion from './Paginacion'
 import './MonitoreoIoT.css'
 
 // ------------------------------------------------------------------
@@ -775,34 +776,11 @@ export default function MonitoreoIoT() {
               {lecturasFiltradas.length} lecturas
             </span>
 
-            <div className="monitoreo-paginacion__controles">
-              <button
-                type="button"
-                className="monitoreo-btn-pag"
-                disabled={paginaActual === 1}
-                onClick={() => setPaginaActual((p) => Math.max(1, p - 1))}
-              >
-                &lt;
-              </button>
-              {Array.from({ length: totalPaginas }, (_, i) => i + 1).map((num) => (
-                <button
-                  type="button"
-                  key={num}
-                  className={`monitoreo-btn-pag${paginaActual === num ? ' monitoreo-btn-pag--activo' : ''}`}
-                  onClick={() => setPaginaActual(num)}
-                >
-                  {num}
-                </button>
-              ))}
-              <button
-                type="button"
-                className="monitoreo-btn-pag"
-                disabled={paginaActual === totalPaginas}
-                onClick={() => setPaginaActual((p) => Math.min(totalPaginas, p + 1))}
-              >
-                &gt;
-              </button>
-            </div>
+            <Paginacion
+              paginaActual={paginaActual}
+              totalPaginas={totalPaginas}
+              onCambiar={setPaginaActual}
+            />
 
             <div className="monitoreo-paginacion__por-pag">
               <span>Mostrar {elementosPorPagina} por página</span>

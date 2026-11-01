@@ -545,4 +545,79 @@ export function IconoExclamacion() {
   )
 }
 
+export function IconoPlay() {
+  return (
+    <svg viewBox="0 0 24 24" role="presentation" aria-hidden="true">
+      <path d="M8 5v14l11-7z" fill="currentColor" />
+    </svg>
+  )
+}
+
+export function IconoSubir() {
+  return (
+    <svg viewBox="0 0 24 24" role="presentation" aria-hidden="true">
+      <path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z" fill="currentColor" />
+    </svg>
+  )
+}
+
+export function IconoVideo() {
+  return (
+    <svg viewBox="0 0 24 24" role="presentation" aria-hidden="true">
+      <path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z" fill="currentColor" />
+    </svg>
+  )
+}
+
+export function IconoLibro() {
+  return (
+    <svg viewBox="0 0 24 24" role="presentation" aria-hidden="true">
+      <path d="M18 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 4h5v8l-2.5-1.5L6 12V4z" fill="currentColor" />
+    </svg>
+  )
+}
+
+export function IconoPin() {
+  return (
+    <svg viewBox="0 0 24 24" role="presentation" aria-hidden="true">
+      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 0 1 0-5 2.5 2.5 0 0 1 0 5z" fill="currentColor" />
+    </svg>
+  )
+}
+
+export function IconoCapas() {
+  return (
+    <svg viewBox="0 0 24 24" role="presentation" aria-hidden="true">
+      <path d="m12 2-10 6 10 6 10-6-10-6zm0 14.54L4.24 12 2 13.35 12 19l10-5.65L19.76 12 12 16.54z" fill="currentColor" />
+    </svg>
+  )
+}
+
+export function Icono3D() {
+  return (
+    <svg viewBox="0 0 24 24" role="presentation" aria-hidden="true">
+      <path d="m21 16.5-9 5.2-9-5.2V7.5L12 2.3l9 5.2v9zM12 4.1 4.9 8.2l7.1 4.1 7.1-4.1L12 4.1zm-7 5.8v6.2l7 4v-6.2l-7-4zm9 10.2 7-4V9.9l-7 4v6.2z" fill="currentColor" />
+    </svg>
+  )
+}
+
+export function IconoInfoCirculo() {
+  return (
+    <svg viewBox="0 0 24 24" role="presentation" aria-hidden="true">
+      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" fill="currentColor" />
+    </svg>
+  )
+}
+
+export function IconoRecargar({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" role="presentation" aria-hidden="true">
+      <path
+        d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"
+        fill="currentColor"
+      />
+    </svg>
+  )
+}
+
 

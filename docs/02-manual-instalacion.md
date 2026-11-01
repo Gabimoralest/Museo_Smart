@@ -243,9 +243,53 @@ npm run build      # genera dist/
 npm run preview    # sirve dist/ para probar
 ```
 
-El `dist/` resultante contiene solo archivos estÃ¡ticos; necesita un servidor web
-que ademÃ¡s haga proxy de `/api` al backend (ver propuesta Docker) porque no hay
-CORS.
+El `dist/` resultante contiene solo archivos estáticos; necesita un servidor web
+que además haga proxy de `/api` y `/media` al backend (ver propuesta Docker) porque no hay
+CORS y los archivos subidos se sirven bajo `/media/**`.
+
+#### Configuración de Proxy Inverso en producción (Caddy / Nginx)
+
+En producción, el reverse proxy debe reenviar tanto `/api` como `/media` al backend Spring Boot:
+- `/api/**`: Endpoints de la API REST.
+- `/media/**`: Archivos multimedia subidos (imágenes y videos). Si no se redirige `/media`, las imágenes y videos aparecerán rotos (404).
+- Tamaño máximo de carga: Permitir al menos 55 MB para subidas de video de hasta 50 MB.
+
+**Ejemplo Nginx (`frontend/nginx.conf`):**
+```nginx
+client_max_body_size 55M;
+
+location /api/ {
+    proxy_pass http://backend:8080;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+}
+
+location /media/ {
+    proxy_pass http://backend:8080;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+}
+```
+
+**Ejemplo Caddy (`Caddyfile`):**
+```caddyfile
+:80 {
+    root * /usr/share/caddy
+    file_server
+
+    # Reenvío de API y multimedia al backend Spring Boot
+    @backend path /api/* /media/*
+    handle @backend {
+        request_body {
+            max_size 55MB
+        }
+        reverse_proxy backend:8080
+    }
+
+    # SPA fallback
+    try_files {path} /index.html
+}
+```
 
 ---
 

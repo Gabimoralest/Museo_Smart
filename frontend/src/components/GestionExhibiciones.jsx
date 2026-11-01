@@ -9,6 +9,10 @@ import {
   IconoCerrar,
   IconoAdvertencia,
   IconoEditar,
+  IconoGaleria,
+  IconoCapas,
+  IconoPin,
+  IconoRecargar,
 } from './iconos'
 import { OPCIONES_ESTADO, OPCIONES_ORDEN } from '../data/exhibicionesData'
 import { listarExhibiciones, urlMedia } from '../data/exhibicionesApi'
@@ -53,10 +57,11 @@ function mensajeDeError(error, porDefecto) {
   return porDefecto
 }
 
-// Marcador neutro cuando la exhibición no tiene imagen.
+// Marcador neutro y discreto cuando la exhibición no tiene imagen.
 function MarcadorImagen() {
   return (
     <div className="tarjeta-exh__marcador" role="img" aria-label="Falta imagen">
+      <IconoGaleria className="tarjeta-exh__marcador-icono" />
       <span className="tarjeta-exh__marcador-texto">Falta imagen</span>
     </div>
   )
@@ -217,10 +222,28 @@ export default function GestionExhibiciones({
   return (
     <div className="gestion-exh" ref={contenedorRef}>
       <header className="gestion-exh__cabecera">
-        <h1 className="gestion-exh__titulo">Gestión de exhibiciones</h1>
-        <p className="gestion-exh__subtitulo">
-          Edita el contenido y el multimedia de cada exhibición del museo.
-        </p>
+        <div className="gestion-exh__cabecera-principal">
+          <div className="gestion-exh__cabecera-icono" aria-hidden="true">
+            <IconoGaleria />
+          </div>
+          <div className="gestion-exh__cabecera-textos">
+            <h1 className="gestion-exh__titulo">Gestión de exhibiciones</h1>
+            <p className="gestion-exh__subtitulo">
+              Administra la información y el contenido multimedia de las exhibiciones del museo.
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          className="gestion-exh__btn-actualizar"
+          onClick={() => cargar()}
+          disabled={cargando}
+          title="Actualizar datos"
+          aria-label="Actualizar datos de exhibiciones"
+        >
+          <IconoRecargar className={cargando ? 'is-spinning' : ''} />
+          <span>Actualizar datos</span>
+        </button>
       </header>
 
       <section className="gestion-exh__resumen" aria-label="Métricas de exhibiciones">
@@ -348,7 +371,8 @@ export default function GestionExhibiciones({
             aria-pressed={soloSinImagen}
             onClick={() => setSoloSinImagen((v) => !v)}
           >
-            Sin imagen
+            <IconoGaleria className="gestion-exh__filtro-rapido-icono" />
+            <span>Sin imagen</span>
           </button>
 
           <div className="menu-desplegable menu-desplegable--orden">
@@ -407,34 +431,73 @@ export default function GestionExhibiciones({
       {!cargando && !errorCarga && filtradas.length > 0 && (
         <section className="gestion-exh__cuadricula" aria-label="Lista de exhibiciones">
           {filtradas.map((item) => (
-            <article className="tarjeta-exh" key={item.id} id={`exhibicion-${item.id}`}>
+            <article
+              className="tarjeta-exh"
+              key={item.id}
+              id={`exhibicion-${item.id}`}
+              data-codigo={item.codigo}
+            >
               <div className="tarjeta-exh__imagen-contenedor">
                 {item.imagenUrl ? (
-                  <img src={item.imagenUrl} alt={item.nombre} className="tarjeta-exh__imagen" loading="lazy" />
+                  <img
+                    src={item.imagenUrl}
+                    alt={item.nombre}
+                    className="tarjeta-exh__imagen"
+                    loading="lazy"
+                  />
                 ) : (
                   <MarcadorImagen />
                 )}
-                <span className={`tarjeta-exh__badge ${item.activa ? 'tarjeta-exh__badge--activa' : 'tarjeta-exh__badge--inactiva'}`}>
+                <span
+                  className={`tarjeta-exh__badge ${
+                    item.activa ? 'tarjeta-exh__badge--activa' : 'tarjeta-exh__badge--inactiva'
+                  }`}
+                >
                   <span className="tarjeta-exh__badge-punto" aria-hidden="true" />
                   {item.activa ? 'Activa' : 'Inactiva'}
                 </span>
-                {!item.tieneImagen && (
-                  <span className="tarjeta-exh__badge-imagen">Falta imagen</span>
-                )}
               </div>
 
               <div className="tarjeta-exh__cuerpo">
-                <h2 className="tarjeta-exh__nombre">{item.nombre}</h2>
-                <p className="tarjeta-exh__subtitulo">
-                  {item.especial ? 'Exhibición especial' : (item.sala || item.categoria)}
-                </p>
-                {item.descripcionCorta && (
-                  <p className="tarjeta-exh__descripcion">{item.descripcionCorta}</p>
-                )}
+                <h2 className="tarjeta-exh__nombre" title={item.nombre}>
+                  {item.nombre}
+                </h2>
+
+                <div className="tarjeta-exh__detalles">
+                  <div
+                    className="tarjeta-exh__detalle-fila"
+                    title={`Categoría: ${item.categoria || (item.especial ? 'Exhibición especial' : 'General')}`}
+                  >
+                    <span className="tarjeta-exh__detalle-icono" aria-hidden="true">
+                      <IconoCapas />
+                    </span>
+                    <span className="tarjeta-exh__detalle-texto">
+                      {item.categoria || (item.especial ? 'Exhibición especial' : 'General')}
+                    </span>
+                  </div>
+
+                  <div
+                    className="tarjeta-exh__detalle-fila"
+                    title={`Sala: ${item.especial ? 'Exhibición especial' : (item.sala || 'Sin sala asignada')}`}
+                  >
+                    <span className="tarjeta-exh__detalle-icono" aria-hidden="true">
+                      <IconoPin />
+                    </span>
+                    <span className="tarjeta-exh__detalle-texto">
+                      {item.especial ? 'Exhibición especial' : (item.sala || 'Sin sala asignada')}
+                    </span>
+                  </div>
+                </div>
 
                 <div className="tarjeta-exh__acciones">
-                  <button type="button" className="boton-exh boton-exh--editar" onClick={() => editar(item)}>
-                    <IconoEditar /> Editar
+                  <button
+                    type="button"
+                    className="boton-exh boton-exh--editar"
+                    onClick={() => editar(item)}
+                    aria-label={`Editar exhibición ${item.nombre}`}
+                  >
+                    <IconoEditar />
+                    <span>Editar</span>
                   </button>
                 </div>
               </div>
