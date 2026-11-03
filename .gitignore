@@ -40,3 +40,4 @@ docker/mosquitto/config/passwd
 # --- Multimedia subida en desarrollo (no versionar) ---
 media/
 backend/media/
+imagenes-exhibiciones/
