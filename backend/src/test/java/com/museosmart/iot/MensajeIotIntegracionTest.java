@@ -141,14 +141,16 @@ class MensajeIotIntegracionTest {
     }
 
     private String payloadAmbiental(UUID id, String codigo, Long salaId) {
+        String idJson = salaId == null ? "" : "\"salaId\":" + salaId + ",";
         return "{\"mensajeId\":\"" + id + "\",\"sensorCodigo\":\"" + codigo + "\","
-                + "\"salaId\":" + salaId + ",\"temperatura\":22.5,\"humedad\":50.0,"
+                + idJson + "\"temperatura\":22.5,\"humedad\":50.0,"
                 + "\"luminosidad\":300.0,\"timestamp\":\"2026-10-13T21:50:00Z\"}";
     }
 
     private String payloadPresencia(UUID id, String codigo, Long exId, boolean presencia) {
+        String idJson = exId == null ? "" : "\"exhibicionId\":" + exId + ",";
         return "{\"mensajeId\":\"" + id + "\",\"sensorCodigo\":\"" + codigo + "\","
-                + "\"exhibicionId\":" + exId + ",\"presencia\":" + presencia + ","
+                + idJson + "\"presencia\":" + presencia + ","
                 + "\"timestamp\":\"2026-10-13T21:50:00Z\"}";
     }
 
@@ -192,6 +194,39 @@ class MensajeIotIntegracionTest {
         assertThat(mediciones.get(0).getMetrica()).isEqualTo("PRESENCIA");
     }
 
+    @Test
+    @DisplayName("mensaje ambiental sin salaId se procesa usando la sala del sensor")
+    void ambientalSinSalaId_seProcesa() {
+        Sala sala = sala();
+        String codigo = "IT-AMB-" + UUID.randomUUID();
+        sensorAmbiental(sala, codigo);
+        UUID id = nuevoMensaje();
+
+        service.registrarRecepcion(id, TOPICO_AMB, payloadAmbiental(id, codigo, null), codigo);
+        service.procesarContenido(id, TOPICO_AMB, TOPICO_AMB, TOPICO_PRE);
+
+        MensajeIot mensaje = mensajeIotRepository.findByMensajeId(id).orElseThrow();
+        assertThat(mensaje.getEstadoProcesamiento()).isEqualTo("PROCESADO");
+        assertThat(medicionPendienteRepository.findByMensajeIotId(mensaje.getId())).hasSize(3);
+    }
+
+    @Test
+    @DisplayName("mensaje de presencia sin exhibicionId se procesa usando la del sensor")
+    void presenciaSinExhibicionId_seProcesa() {
+        Exhibicion ex = exhibicion();
+        Exhibicion fresco = exhibicionRepository.findById(ex.getId()).orElseThrow();
+        String codigo = "IT-PRE-" + UUID.randomUUID();
+        sensorPresencia(fresco, codigo);
+        UUID id = nuevoMensaje();
+        recordarSesion(id);
+
+        service.registrarRecepcion(id, TOPICO_PRE, payloadPresencia(id, codigo, null, true), codigo);
+        service.procesarContenido(id, TOPICO_PRE, TOPICO_AMB, TOPICO_PRE);
+
+        MensajeIot mensaje = mensajeIotRepository.findByMensajeId(id).orElseThrow();
+        assertThat(mensaje.getEstadoProcesamiento()).isEqualTo("PROCESADO");
+        assertThat(medicionPendienteRepository.findByMensajeIotId(mensaje.getId())).hasSize(1);
+    }
     // ------------------------------------------------------------
     // Visitas simuladas por IoT -> popularidad
     // ------------------------------------------------------------

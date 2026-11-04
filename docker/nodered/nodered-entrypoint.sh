@@ -19,8 +19,12 @@
 #   En cualquier otro caso el flujo existente se respeta intacto.
 #
 # Credenciales:
-#   Este script NO lee, crea ni modifica flows_cred.json ni ningun secreto.
-#   El cifrado de credenciales de Node-RED queda intacto (se configura por UI).
+#   Este script NUNCA escribe valores secretos. Solo, cuando el volumen es
+#   nuevo (no existe /data/flows_cred.json), siembra las credenciales del nodo
+#   MQTT como REFERENCIAS de entorno ("${MQTT_USERNAME}", "${MQTT_PASSWORD}").
+#   Node-RED sustituye esas referencias al instanciar el nodo, tomando los
+#   valores de las variables de entorno del contenedor (definidas en
+#   docker-compose.yml). Si ya existe un flows_cred.json, se respeta intacto.
 #
 # Arranque:
 #   Delega en el entrypoint oficial de la imagen (no lo reemplaza funcionalmente).
@@ -29,8 +33,10 @@ set -e
 
 ORIGEN="/data-import/museo-smart-flows.json"
 DESTINO="/data/flows.json"
+CREDENCIALES="/data/flows_cred.json"
 MARCADOR_PLACEHOLDER="please check you have started this container with a volume"
 MARCADOR_FLUJO_REAL="museo/sensores/ambiental"
+ID_BROKER_MQTT="4c080e9182914b84"
 
 if [ ! -f "$ORIGEN" ]; then
     echo "[seeder] ERROR: no se encontro el flujo de origen en $ORIGEN" >&2
@@ -46,6 +52,23 @@ elif grep -q "$MARCADOR_PLACEHOLDER" "$DESTINO" 2>/dev/null \
     cp "$ORIGEN" "$DESTINO"
 else
     echo "[seeder] $DESTINO ya esta configurado; no se sobrescribe."
+fi
+
+# Credenciales del broker MQTT SOLO la primera vez. Son referencias de entorno,
+# no secretos: Node-RED las resuelve con MQTT_USERNAME / MQTT_PASSWORD del
+# contenedor. Si el archivo ya existe (aunque este cifrado), no se toca.
+if [ ! -f "$CREDENCIALES" ]; then
+    echo "[seeder] $CREDENCIALES no existe; se siembran referencias de entorno para el broker MQTT."
+    cat > "$CREDENCIALES" <<EOF
+{
+    "$ID_BROKER_MQTT": {
+        "user": "\${MQTT_USERNAME}",
+        "password": "\${MQTT_PASSWORD}"
+    }
+}
+EOF
+else
+    echo "[seeder] $CREDENCIALES ya existe; no se sobrescribe."
 fi
 
 # Delegar en el entrypoint oficial de la imagen (mismo userDir y FLOWS).

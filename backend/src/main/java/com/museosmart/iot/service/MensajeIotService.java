@@ -139,7 +139,9 @@ public class MensajeIotService {
             throw new MensajeInvalidoException(
                     "el sensor " + dto.sensorCodigo() + " no es ambiental o no tiene sala");
         }
-        if (!sensor.getSala().getId().equals(dto.salaId())) {
+        // salaId es opcional: la identidad es sensorCodigo y la sala se toma del
+        // sensor. Solo se rechaza si el cliente envia una sala que no coincide.
+        if (dto.salaId() != null && !sensor.getSala().getId().equals(dto.salaId())) {
             throw new MensajeInvalidoException("el sensor " + dto.sensorCodigo()
                     + " no corresponde a la sala " + dto.salaId());
         }
@@ -168,7 +170,9 @@ public class MensajeIotService {
             throw new MensajeInvalidoException(
                     "el sensor " + dto.sensorCodigo() + " no es de presencia o no tiene exhibicion");
         }
-        if (!sensor.getExhibicion().getId().equals(dto.exhibicionId())) {
+        // exhibicionId es opcional: la identidad es sensorCodigo y la exhibicion
+        // se toma del sensor. Solo se rechaza si el cliente envia una que no coincide.
+        if (dto.exhibicionId() != null && !sensor.getExhibicion().getId().equals(dto.exhibicionId())) {
             throw new MensajeInvalidoException("el sensor " + dto.sensorCodigo()
                     + " no corresponde a la exhibicion " + dto.exhibicionId());
         }

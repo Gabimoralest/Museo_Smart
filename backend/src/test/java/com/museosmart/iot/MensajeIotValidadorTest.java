@@ -73,9 +73,16 @@ class MensajeIotValidadorTest {
     }
 
     @Test
-    @DisplayName("salaId ausente es rechazado en ambiental")
-    void salaIdAusente_esRechazado() {
+    @DisplayName("salaId ausente es aceptado (opcional): la sala se toma del sensor")
+    void salaIdAusente_esAceptado() {
         MensajeAmbientalDto dto = new MensajeAmbientalDto(UUID.randomUUID(), "S1", null, 20.0, 50.0, 100.0, AHORA);
+        assertThatCode(() -> validador.validarAmbiental(dto)).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("salaId no positivo es rechazado")
+    void salaIdNoPositivo_esRechazado() {
+        MensajeAmbientalDto dto = new MensajeAmbientalDto(UUID.randomUUID(), "S1", 0L, 20.0, 50.0, 100.0, AHORA);
         assertThatThrownBy(() -> validador.validarAmbiental(dto))
                 .isInstanceOf(MensajeInvalidoException.class)
                 .hasMessageContaining("salaId");
@@ -118,9 +125,16 @@ class MensajeIotValidadorTest {
     }
 
     @Test
-    @DisplayName("exhibicionId ausente es rechazado en presencia")
-    void exhibicionIdAusente_esRechazado() {
+    @DisplayName("exhibicionId ausente es aceptado (opcional): la exhibicion se toma del sensor")
+    void exhibicionIdAusente_esAceptado() {
         MensajePresenciaDto dto = new MensajePresenciaDto(UUID.randomUUID(), "P1", null, true, AHORA);
+        assertThatCode(() -> validador.validarPresencia(dto)).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("exhibicionId no positivo es rechazado")
+    void exhibicionIdNoPositivo_esRechazado() {
+        MensajePresenciaDto dto = new MensajePresenciaDto(UUID.randomUUID(), "P1", 0L, true, AHORA);
         assertThatThrownBy(() -> validador.validarPresencia(dto))
                 .isInstanceOf(MensajeInvalidoException.class)
                 .hasMessageContaining("exhibicionId");

@@ -3,8 +3,10 @@ package com.museosmart.iot.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.museosmart.entity.Exhibicion;
 import com.museosmart.entity.MensajeIot;
+import com.museosmart.entity.Sala;
 import com.museosmart.entity.Sensor;
 import com.museosmart.entity.Visita;
+import com.museosmart.iot.MensajeInvalidoException;
 import com.museosmart.iot.MensajeIotValidador;
 import com.museosmart.repository.MedicionPendienteRepository;
 import com.museosmart.repository.MensajeIotRepository;
@@ -27,6 +29,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -114,8 +117,22 @@ class MensajeIotServiceTest {
         mensaje.setMensajeId(mensajeId);
         mensaje.setTopico(TOPICO_PRE);
         mensaje.setSensorCodigo(CODIGO);
+        String idJson = exhibicionId == null ? "" : "\"exhibicionId\":" + exhibicionId + ",";
         mensaje.setPayload("{\"mensajeId\":\"" + mensajeId + "\",\"sensorCodigo\":\"" + CODIGO + "\","
-                + "\"exhibicionId\":" + exhibicionId + ",\"presencia\":" + presencia + ","
+                + idJson + "\"presencia\":" + presencia + ","
+                + "\"timestamp\":\"2026-10-13T21:50:00Z\"}");
+        return mensaje;
+    }
+
+    private MensajeIot mensajeAmbiental(Long salaId) {
+        UUID mensajeId = UUID.randomUUID();
+        MensajeIot mensaje = new MensajeIot();
+        mensaje.setMensajeId(mensajeId);
+        mensaje.setTopico(TOPICO_AMB);
+        mensaje.setSensorCodigo(CODIGO);
+        String idJson = salaId == null ? "" : "\"salaId\":" + salaId + ",";
+        mensaje.setPayload("{\"mensajeId\":\"" + mensajeId + "\",\"sensorCodigo\":\"" + CODIGO + "\","
+                + idJson + "\"temperatura\":22.5,\"humedad\":50.0,\"luminosidad\":300.0,"
                 + "\"timestamp\":\"2026-10-13T21:50:00Z\"}");
         return mensaje;
     }
@@ -126,6 +143,32 @@ class MensajeIotServiceTest {
         when(sensorRepository.findByCodigoConBloqueo(CODIGO))
                 .thenReturn(Optional.of(sensor));
         service.procesarContenido(mensaje.getMensajeId(), TOPICO_PRE, TOPICO_AMB, TOPICO_PRE);
+    }
+
+    private Sala sala(Long id) {
+        Sala s = new Sala();
+        setId(s, id);
+        s.setNombre("Sala " + id);
+        s.setCodigo3d("SALA_" + id);
+        return s;
+    }
+
+    private Sensor sensorAmbiental(Long id, Sala sala) {
+        Sensor s = new Sensor();
+        setId(s, id);
+        s.setCodigo(CODIGO);
+        s.setTipo("MULTI");
+        s.setCategoria("AMBIENTAL");
+        s.setSala(sala);
+        return s;
+    }
+
+    private void procesarAmbiental(Sensor sensor, MensajeIot mensaje) {
+        when(mensajeIotRepository.findByMensajeId(mensaje.getMensajeId()))
+                .thenReturn(Optional.of(mensaje));
+        when(sensorRepository.findByCodigo(CODIGO))
+                .thenReturn(Optional.of(sensor));
+        service.procesarContenido(mensaje.getMensajeId(), TOPICO_AMB, TOPICO_AMB, TOPICO_PRE);
     }
 
     @Test
@@ -242,5 +285,93 @@ class MensajeIotServiceTest {
         verify(popularidadService, never()).registrarVisita(any(), anyString(), anyString());
         verify(medicionPendienteRepository).save(any());
         verify(sensorRepository).save(s);
+    }
+
+    @Test
+    @DisplayName("presencia sin exhibicionId se procesa usando la exhibicion del sensor")
+    void presenciaSinExhibicionId_seProcesa() {
+        Exhibicion ex = exhibicion(7L, true);
+        Sensor s = sensor(10L, ex, null);
+
+        procesar(s, mensajePresencia(null, true));
+
+        verify(popularidadService, times(1))
+                .registrarVisita(eq(7L), anyString(), eq(Visita.FUENTE_SENSOR));
+        verify(medicionPendienteRepository).save(any());
+        verify(sensorRepository).save(s);
+    }
+
+    @Test
+    @DisplayName("presencia con exhibicionId incorrecto se rechaza")
+    void presenciaConExhibicionIdIncorrecto_seRechaza() {
+        Exhibicion ex = exhibicion(7L, true);
+        Sensor s = sensor(10L, ex, null);
+        MensajeIot mensaje = mensajePresencia(999L, true);
+        when(mensajeIotRepository.findByMensajeId(mensaje.getMensajeId()))
+                .thenReturn(Optional.of(mensaje));
+        when(sensorRepository.findByCodigoConBloqueo(CODIGO))
+                .thenReturn(Optional.of(s));
+
+        assertThatThrownBy(() -> service.procesarContenido(
+                mensaje.getMensajeId(), TOPICO_PRE, TOPICO_AMB, TOPICO_PRE))
+                .isInstanceOf(MensajeInvalidoException.class)
+                .hasMessageContaining("no corresponde a la exhibicion");
+
+        verify(popularidadService, never()).registrarVisita(any(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("ambiental sin salaId se procesa usando la sala del sensor")
+    void ambientalSinSalaId_seProcesa() {
+        Sala sala = sala(23L);
+        Sensor s = sensorAmbiental(10L, sala);
+
+        procesarAmbiental(s, mensajeAmbiental(null));
+
+        verify(medicionPendienteRepository, times(3)).save(any());
+    }
+
+    @Test
+    @DisplayName("ambiental con salaId correcto se procesa")
+    void ambientalConSalaIdCorrecto_seProcesa() {
+        Sala sala = sala(23L);
+        Sensor s = sensorAmbiental(10L, sala);
+
+        procesarAmbiental(s, mensajeAmbiental(23L));
+
+        verify(medicionPendienteRepository, times(3)).save(any());
+    }
+
+    @Test
+    @DisplayName("ambiental con salaId incorrecto se rechaza")
+    void ambientalConSalaIdIncorrecto_seRechaza() {
+        Sala sala = sala(23L);
+        Sensor s = sensorAmbiental(10L, sala);
+        MensajeIot mensaje = mensajeAmbiental(1L);
+        when(mensajeIotRepository.findByMensajeId(mensaje.getMensajeId()))
+                .thenReturn(Optional.of(mensaje));
+        when(sensorRepository.findByCodigo(CODIGO))
+                .thenReturn(Optional.of(s));
+
+        assertThatThrownBy(() -> service.procesarContenido(
+                mensaje.getMensajeId(), TOPICO_AMB, TOPICO_AMB, TOPICO_PRE))
+                .isInstanceOf(MensajeInvalidoException.class)
+                .hasMessageContaining("no corresponde a la sala");
+
+        verify(medicionPendienteRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("sensor desconocido se rechaza")
+    void sensorDesconocido_seRechaza() {
+        MensajeIot mensaje = mensajeAmbiental(null);
+        when(mensajeIotRepository.findByMensajeId(mensaje.getMensajeId()))
+                .thenReturn(Optional.of(mensaje));
+        when(sensorRepository.findByCodigo(CODIGO)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.procesarContenido(
+                mensaje.getMensajeId(), TOPICO_AMB, TOPICO_AMB, TOPICO_PRE))
+                .isInstanceOf(MensajeInvalidoException.class)
+                .hasMessageContaining("sensor desconocido");
     }
 }

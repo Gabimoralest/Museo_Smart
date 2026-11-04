@@ -66,6 +66,14 @@ services:
       TZ: ${TZ:-America/Bogota}
       NODE_RED_ENABLE_PROJECTS: "false"
       FLOWS: flows.json
+      # Broker y credenciales que usa el nodo MQTT del flujo. Se resuelven por
+      # sustitucion de entorno (${VAR}) en museo-smart-flows.json; nunca se
+      # escriben secretos en el flujo versionado. Dentro de la red Docker el
+      # broker es el servicio "mosquitto" en el puerto interno 1883.
+      MQTT_HOST: ${MQTT_HOST:-mosquitto}
+      MQTT_PORT: ${MQTT_PORT:-1883}
+      MQTT_USERNAME: ${MQTT_USERNAME}
+      MQTT_PASSWORD: ${MQTT_PASSWORD}
     # Seeder idempotente: copia museo-smart-flows.json a /data/flows.json solo
     # si no existe o si /data/flows.json es el placeholder de la imagen; luego
     # delega en el entrypoint oficial de Node-RED. No toca credenciales.

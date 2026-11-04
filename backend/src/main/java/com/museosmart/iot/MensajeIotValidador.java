@@ -27,8 +27,8 @@ public class MensajeIotValidador {
         }
         validarMensajeId(dto.mensajeId());
         validarCodigo(dto.sensorCodigo());
-        if (dto.salaId() == null || dto.salaId() <= 0) {
-            throw new MensajeInvalidoException("salaId ausente o invalido");
+        if (dto.salaId() != null && dto.salaId() <= 0) {
+            throw new MensajeInvalidoException("salaId invalido");
         }
         validarTimestamp(dto.timestamp());
         validarRango("temperatura", dto.temperatura(), limites.getTemperatura());
@@ -42,8 +42,8 @@ public class MensajeIotValidador {
         }
         validarMensajeId(dto.mensajeId());
         validarCodigo(dto.sensorCodigo());
-        if (dto.exhibicionId() == null || dto.exhibicionId() <= 0) {
-            throw new MensajeInvalidoException("exhibicionId ausente o invalido");
+        if (dto.exhibicionId() != null && dto.exhibicionId() <= 0) {
+            throw new MensajeInvalidoException("exhibicionId invalido");
         }
         if (dto.presencia() == null) {
             throw new MensajeInvalidoException("presencia ausente");

@@ -8,8 +8,10 @@ import java.util.UUID;
 /**
  * Payload del topico de presencia {@code museo/sensores/presencia}.
  *
- * <p>Un sensor de presencia pertenece a una unica exhibicion.
- * {@code exhibicionId} debe corresponder a la exhibicion asociada al sensor.</p>
+ * <p>Un sensor de presencia pertenece a una unica exhibicion. La identidad
+ * del sensor es su {@code sensorCodigo}; la exhibicion se toma del sensor en
+ * la base. {@code exhibicionId} es opcional: si viene debe coincidir con la
+ * exhibicion real del sensor.</p>
  */
 public record MensajePresenciaDto(
         @JsonProperty("mensajeId") UUID mensajeId,
