@@ -4,7 +4,7 @@ const apartados = [
     etiqueta: 'Historia',
     titulo: 'Nuestra historia',
     texto:
-      'Museo Smart nació del deseo de reunir en un mismo espacio el arte, la cultura y la naturaleza. Lo que comenzó como una pequeña colección de piezas patrimoniales se transformó con los años en un museo virtual que hoy recorre cuatro salas temáticas abiertas a todo el público.',
+      'Museo Smart nació del deseo de reunir en un mismo espacio el arte, la cultura y la naturaleza. Lo que comenzó como una pequeña colección de piezas patrimoniales se transformó con los años en un museo virtual que hoy reúne sus salas temáticas en un recorrido abierto a todo el público.',
   },
   {
     id: 'proposito',

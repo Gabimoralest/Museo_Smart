@@ -31,7 +31,7 @@
 
 .monitoreo-cabecera__titulo {
   font-family: var(--fuente-titulo, 'Cinzel', serif);
-  font-size: 30px;
+  font-size: clamp(22px, 2.5vw, 30px);
   font-weight: 700;
   color: #1a1714;
   margin: 0;
@@ -69,7 +69,7 @@
 
 .monitoreo-stats {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
 }
 
@@ -84,6 +84,7 @@
   gap: 16px;
   box-shadow: 0 4px 20px -8px rgba(33, 25, 15, 0.05);
   overflow: hidden;
+  min-width: 0;
 }
 
 .monitoreo-stat__icono {
@@ -188,8 +189,9 @@
 
 .monitoreo-graficas-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 20px;
+  min-width: 0;
 }
 
 .monitoreo-grafica-card {
@@ -197,10 +199,12 @@
   background: #ffffff;
   border: 1px solid rgba(33, 25, 15, 0.08);
   border-radius: 14px;
-  padding: 22px 24px 18px;
+  padding: clamp(16px, 2vw, 22px) clamp(16px, 2.2vw, 24px) 18px;
   box-shadow: 0 4px 20px -8px rgba(33, 25, 15, 0.05);
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .monitoreo-grafica__header {
@@ -393,6 +397,8 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  min-height: 44px;
+  padding: 6px 4px;
   font-size: 13px;
   color: #b88e38;
   font-weight: 600;
@@ -533,10 +539,11 @@
   background: #ffffff;
   border: 1px solid rgba(33, 25, 15, 0.08);
   border-radius: 14px;
-  padding: 22px 24px;
+  padding: clamp(16px, 2vw, 22px) clamp(16px, 2.2vw, 24px);
   box-shadow: 0 4px 20px -8px rgba(33, 25, 15, 0.05);
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
 .monitoreo-tabla-header {
@@ -565,16 +572,18 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: 13px;
   color: #736c61;
 }
 
+select.monitoreo-select-wrap,
 .monitoreo-select-wrap select {
-  padding: 5px 10px;
-  border-radius: 6px;
+  min-height: 44px;
+  padding: 6px 12px;
+  border-radius: 8px;
   border: 1px solid rgba(33, 25, 15, 0.12);
   background: #faf7f0;
-  font-size: 12px;
+  font-size: 14px;
   color: #1a1714;
   outline: none;
 }
@@ -717,7 +726,7 @@
 
 @media (max-width: 1200px) {
   .monitoreo-stats {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .monitoreo-graficas-grid {
@@ -725,7 +734,7 @@
   }
 
   .monitoreo-salas-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .monitoreo-bottom-grid {
@@ -740,6 +749,92 @@
 
   .monitoreo-salas-grid {
     grid-template-columns: 1fr;
+  }
+
+  select.monitoreo-select-wrap,
+  .monitoreo-select-wrap select {
+    font-size: 16px;
+  }
+
+  .monitoreo-alerta-fila {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+
+  .monitoreo-alerta-fila__info {
+    flex: 1 1 calc(100% - 110px);
+  }
+
+  .monitoreo-alerta-fila__fecha {
+    width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .monitoreo-tabla-filtros {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .monitoreo-select-wrap {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .monitoreo-select-wrap select {
+    flex: 1;
+  }
+
+  .monitoreo-tabla-contenedor {
+    overflow-x: visible;
+  }
+
+  .monitoreo-tabla thead {
+    display: none;
+  }
+
+  .monitoreo-tabla,
+  .monitoreo-tabla tbody {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+  }
+
+  .monitoreo-tabla tr {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: #faf7f0;
+    border: 1px solid rgba(33, 25, 15, 0.08);
+  }
+
+  .monitoreo-tabla td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(33, 25, 15, 0.05);
+    white-space: normal;
+    text-align: right;
+    font-size: 13.5px;
+  }
+
+  .monitoreo-tabla td:last-child {
+    border-bottom: none;
+  }
+
+  .monitoreo-tabla td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: #635b50;
+    font-size: 12.5px;
+    text-align: left;
+    flex-shrink: 0;
   }
 }
 
@@ -765,6 +860,7 @@
   border-radius: 10px;
   font-size: 14px;
   font-weight: 500;
+  flex-wrap: wrap;
 }
 
 .monitoreo-aviso svg {
@@ -781,12 +877,13 @@
 
 .monitoreo-aviso__boton {
   margin-left: auto;
-  padding: 8px 16px;
+  min-height: 44px;
+  padding: 8px 18px;
   border-radius: 999px;
   background: #21190f;
   color: #f7f2e9;
   border: none;
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 600;
   cursor: pointer;
 }

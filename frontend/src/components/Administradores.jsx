@@ -132,7 +132,9 @@ function mensajeOperacion(error, porDefecto) {
 export default function Administradores({ sesion: _sesion }) {
   const [admins, setAdmins] = useState([])
   const [adminSeleccionadoId, setAdminSeleccionadoId] = useState(null)
-  const [drawerAbierto, setDrawerAbierto] = useState(true)
+  const [drawerAbierto, setDrawerAbierto] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth > 1100 : true,
+  )
   const detalleRef = useRef(null)
 
   // Estado de la consulta real al backend.
@@ -597,8 +599,8 @@ export default function Administradores({ sesion: _sesion }) {
                       className={activa ? 'fila--activa' : ''}
                       onClick={() => seleccionarAdmin(item)}
                     >
-                      <td>{indiceInicio + index + 1}</td>
-                      <td>
+                      <td data-label="#">{indiceInicio + index + 1}</td>
+                      <td data-label="Nombre">
                         <div className="admin-celda-nombre">
                           <span className="admin-avatar-mini">{item.avatar}</span>
                           <span className="admin-nombre-texto">{item.nombre}</span>
@@ -609,19 +611,19 @@ export default function Administradores({ sesion: _sesion }) {
                           )}
                         </div>
                       </td>
-                      <td className="col-correo">{item.correo}</td>
-                      <td>
+                      <td data-label="Correo" className="col-correo">{item.correo}</td>
+                      <td data-label="Rol">
                         <span className={`admin-rol-badge admin-rol-badge--${item.esSuperAdmin ? 'super' : 'normal'}`}>
                           {item.rol}
                         </span>
                       </td>
-                      <td>
+                      <td data-label="Estado">
                         <span className={`admin-estado-pill admin-estado-pill--${item.estado.toLowerCase()}`}>
                           ● {item.estado}
                         </span>
                       </td>
-                      <td>{item.fechaCreacion}</td>
-                      <td>
+                      <td data-label="Creado">{item.fechaCreacion}</td>
+                      <td data-label="Acciones">
                         {item.esSuperAdmin ? (
                           <span className="admin-acciones-protegida" title="La cuenta de SuperAdmin no se modifica desde el panel">
                             Cuenta protegida
@@ -691,6 +693,12 @@ export default function Administradores({ sesion: _sesion }) {
 
         {/* Panel lateral: Detalle del Administrador */}
         {tieneDrawer && (
+          <>
+          <div
+            className="admin-detalle-telon"
+            aria-hidden="true"
+            onClick={() => setDrawerAbierto(false)}
+          />
           <aside ref={detalleRef} className="admin-detalle-panel" aria-label="Detalle del administrador">
             <header className="admin-detalle__header">
               <div className="admin-detalle__header-izq">
@@ -767,6 +775,7 @@ export default function Administradores({ sesion: _sesion }) {
               )}
             </div>
           </aside>
+          </>
         )}
       </div>
 

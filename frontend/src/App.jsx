@@ -1,40 +1,32 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import Navbar from './components/Navbar'
-import Hero from './components/Hero'
-import Salas from './components/Salas'
-import AcercaDe from './components/AcercaDe'
 import Footer from './components/Footer'
 import ModalSala from './components/ModalSala'
 import Login from './components/Login'
 import Recuperacion from './components/Recuperacion'
 import PanelAdmin from './components/PanelAdmin'
 import { obtenerSesion, limpiarSesion } from './data/sessionService'
+import { useSalasPublicas } from './data/useSalasPublicas'
+import { RUTAS, esPaginaPublica, leerRuta, tituloDe } from './data/rutas'
 import './App.css'
 
 // El visor 3D (three.js + modelo de ~64 MB) se carga solo al entrar en la ruta
-// del recorrido, para no penalizar la página principal.
+// del recorrido, para no penalizar el resto del sitio.
 const PaginaRecorrido = lazy(() => import('./components/PaginaRecorrido'))
+// Páginas públicas diferidas: el inicio no arrastra el código de Salas,
+// Acerca de ni Experiencia.
+const PaginaInicio = lazy(() => import('./components/PaginaInicio'))
+const PaginaSalas = lazy(() => import('./components/PaginaSalas'))
+const PaginaAcerca = lazy(() => import('./components/PaginaAcerca'))
+const PaginaExperiencia = lazy(() => import('./components/PaginaExperiencia'))
+const PaginaNoEncontrada = lazy(() => import('./components/PaginaNoEncontrada'))
 
-const RUTA_LOGIN = '#/login'
-const RUTA_RECUPERACION = '#/recuperar'
-const RUTA_ADMIN = '#/admin'
-const RUTA_EXHIBICIONES = '#/admin/exhibiciones'
-const RUTA_RECORRIDO = '#/recorrido-virtual'
-
-const leerRuta = () => {
-  const hash = window.location.hash
-  if (hash === RUTA_LOGIN) return 'login'
-  if (hash === RUTA_RECUPERACION) return 'recuperacion'
-  if (hash === RUTA_RECORRIDO) return 'recorrido'
-  if (
-    hash === RUTA_ADMIN ||
-    hash === RUTA_EXHIBICIONES ||
-    hash.startsWith('#/admin') ||
-    hash === '#gestion-exhibiciones'
-  ) {
-    return 'admin'
-  }
-  return 'inicio'
+function CargandoPagina() {
+  return (
+    <div className="app__cargando" role="status">
+      Cargando…
+    </div>
+  )
 }
 
 export default function App() {
@@ -42,12 +34,27 @@ export default function App() {
   const [ruta, setRuta] = useState(leerRuta)
   const [correoRecuperacion, setCorreoRecuperacion] = useState('')
   const [sesion, setSesion] = useState(obtenerSesion)
+  // Salas: una única carga desde GET /api/v1/salas, compartida por las páginas
+  // que las necesitan (incluidos el error y el reintento).
+  const { salas, cargando: cargandoSalas, error: errorSalas, reintentar } = useSalasPublicas()
 
+  // Navegación por hash. Al cambiar de página se sube al inicio y se actualiza
+  // el título de la pestaña. El botón Atrás/Adelante del navegador funciona
+  // porque siempre se escucha `hashchange`.
   useEffect(() => {
-    const alCambiarRuta = () => setRuta(leerRuta())
+    const alCambiarRuta = () => {
+      setRuta(leerRuta())
+      // Al cambiar de página se cierra cualquier modal de sala abierto.
+      setSalaActiva(null)
+      window.scrollTo({ top: 0 })
+    }
     window.addEventListener('hashchange', alCambiarRuta)
     return () => window.removeEventListener('hashchange', alCambiarRuta)
   }, [])
+
+  useEffect(() => {
+    document.title = tituloDe(ruta)
+  }, [ruta])
 
   const abrirSala = (sala) => setSalaActiva(sala)
   const cerrarSala = () => setSalaActiva(null)
@@ -56,26 +63,22 @@ export default function App() {
     window.location.hash = destino
   }
 
-  const abrirIngreso = () => irA(RUTA_LOGIN)
-
   const volverAlInicio = () => {
-    window.location.hash = ''
+    window.location.hash = RUTAS.inicio
     window.scrollTo({ top: 0 })
   }
 
   const cerrarSesion = () => {
     limpiarSesion()
     setSesion(null)
-    irA(RUTA_LOGIN)
+    irA(RUTAS.login)
   }
 
-  // Tras un login correcto: no existe todavía un dashboard administrativo.
-  // La navegación dirige a una ruta '#/admin' que informa del estado real
-  // (no simula funcionalidad). `debeCambiarContrasena` se respeta mostrando
-  // el aviso correspondiente en la pantalla.
+  // Tras un login correcto se dirige a la ruta de administración; la
+  // autorización real la impone el backend en cada endpoint.
   const alIniciarSesion = (nuevaSesion) => {
     setSesion(nuevaSesion)
-    irA(RUTA_ADMIN)
+    irA(RUTAS.admin)
   }
 
   if (ruta === 'login') {
@@ -85,7 +88,7 @@ export default function App() {
         onSesionIniciada={alIniciarSesion}
         onRecuperar={(correo) => {
           setCorreoRecuperacion(correo || '')
-          irA(RUTA_RECUPERACION)
+          irA(RUTAS.recuperacion)
         }}
       />
     )
@@ -95,7 +98,7 @@ export default function App() {
     return (
       <Recuperacion
         correoInicial={correoRecuperacion}
-        onVolverAlLogin={() => irA(RUTA_LOGIN)}
+        onVolverAlLogin={() => irA(RUTAS.login)}
         onVolverAlMuseo={volverAlInicio}
       />
     )
@@ -106,22 +109,20 @@ export default function App() {
       <Suspense
         fallback={
           <div className="app">
-            <Navbar onIngresar={abrirIngreso} />
-            <main className="app__principal" />
+            <Navbar paginaActual={ruta} />
+            <main className="app__principal">
+              <CargandoPagina />
+            </main>
           </div>
         }
       >
-        <PaginaRecorrido
-          onVolver={volverAlInicio}
-          onIngresar={abrirIngreso}
-        />
+        <PaginaRecorrido onVolver={volverAlInicio} sesion={sesion} />
       </Suspense>
     )
   }
 
   if (ruta === 'admin') {
     // Ruta protegida del lado del cliente: sin sesión se vuelve al login.
-    // La autorización real la impone el backend en cada endpoint.
     if (!sesion) {
       return (
         <Login
@@ -129,7 +130,7 @@ export default function App() {
           onSesionIniciada={alIniciarSesion}
           onRecuperar={(correo) => {
             setCorreoRecuperacion(correo || '')
-            irA(RUTA_RECUPERACION)
+            irA(RUTAS.recuperacion)
           }}
         />
       )
@@ -143,15 +144,30 @@ export default function App() {
     )
   }
 
+  // Sitio público: cabecera y pie comunes a todas las páginas.
+  const pagina = esPaginaPublica(ruta) ? ruta : 'noEncontrada'
+
   return (
     <div className="app">
-      <Navbar onIngresar={abrirIngreso} />
+      <Navbar paginaActual={pagina} />
       <main className="app__principal">
-        <Hero onSeleccionarSala={abrirSala} />
-        <Salas onSeleccionarSala={abrirSala} />
-        <AcercaDe />
+        <Suspense fallback={<CargandoPagina />}>
+          {pagina === 'inicio' && <PaginaInicio />}
+          {pagina === 'salas' && (
+            <PaginaSalas
+              salas={salas}
+              cargando={cargandoSalas}
+              error={errorSalas}
+              onReintentar={reintentar}
+              onSeleccionarSala={abrirSala}
+            />
+          )}
+          {pagina === 'acerca' && <PaginaAcerca />}
+          {pagina === 'experiencia' && <PaginaExperiencia />}
+          {pagina === 'noEncontrada' && <PaginaNoEncontrada />}
+        </Suspense>
       </main>
-      <Footer />
+      <Footer sesion={sesion} />
       <ModalSala sala={salaActiva} onCerrar={cerrarSala} />
     </div>
   )

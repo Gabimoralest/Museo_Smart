@@ -81,6 +81,55 @@ export const SENSIBILIDAD = 0.0022
 export const RADIO_JUGADOR = 0.3
 export const COLOR_RESALTE = 0xd6b26a
 
+// ---------------------------------------------------------------------------
+// Exploración (movimiento, cámara e interacción)
+// ---------------------------------------------------------------------------
+// Aceleración y frenado suaves: la velocidad no cambia de golpe. Se usa un
+// suavizado exponencial por fotograma con estas constantes (1/s).
+export const ACELERACION = 18
+export const FRENADO = 22
+// Multiplicador de velocidad al mantener Shift.
+export const VELOCIDAD_CORRER = 1.9
+
+// Velocidad de las transiciones automáticas (clic en el piso, doble clic).
+export const VELOCIDAD_AUTO = 3.4
+// Distancia que avanza o retrocede cada muesca de la rueda, en metros.
+export const PASO_RUEDA = 1.25
+
+// Sensibilidad al arrastrar con el ratón (sin pointer lock).
+export const SENSIBILIDAD_ARRASTRE = 0.0038
+
+// Cadencia máxima del raycast de hover (segundos) y umbrales de acercamiento.
+export const INTERVALO_HOVER = 0.1
+export const DISTANCIA_MIN_ACERCAMIENTO = 1.4
+export const DISTANCIA_MAX_ACERCAMIENTO = 5.5
+
+// Activación por permanencia: tiempo (segundos) que hay que dejar el cursor (o
+// la mira central) sobre una obra para abrir su ficha, y velocidad (m/s) por
+// debajo de la cual se considera que el visitante está quieto.
+export const PERMANENCIA_FICHA = 0.7
+export const VELOCIDAD_PERMANENCIA = 0.25
+
+// ---------------------------------------------------------------------------
+// Vegetación (solo visual)
+// ---------------------------------------------------------------------------
+// Materiales del GLB que identifican plantas. Ninguna instancia de vegetación
+// colisiona (las excluye `colisiones3d.js`), así que ocultarlas no cambia el
+// recorrido: solo reduce el coste de dibujado y despeja la vista.
+const VEGETACION = /(pachira|fern|celandine|periwinkle|plant|tree|arbol|árbol|helecho|seto|cesped|césped|jardinera|maceta)/i
+
+// Porcentaje de instancias de vegetación que se ocultan (0–100).
+export const VEGETACION_OCULTA = 0.5
+// Distancia (m) a partir de la cual una planta deja de dibujarse.
+export const VEGETACION_DISTANCIA = 22
+
+// ¿El material corresponde a vegetación?
+export function esVegetacion(material) {
+  if (!material) return false
+  const nombres = Array.isArray(material) ? material : [material]
+  return nombres.some((m) => VEGETACION.test(m?.name || ''))
+}
+
 // Caja envolvente de todos los nodos que cumplen el patrón. Devuelve null si no
 // hay ninguno (para poder aplicar el respaldo de "toda la escena").
 function cajaDe(raiz, patron) {
@@ -162,6 +211,55 @@ export function calcularAparicion(raiz) {
     x,
     z,
     rotacionY: Math.atan2(-dx, -dz),
+  }
+}
+
+// Punto de vista frente a una pieza. Se elige el lado desde el que ya está el
+// visitante (`preferido`) o, si no se indica, el lado ancho de la pieza (el eje
+// horizontal más corto es la profundidad, así que se mira de frente). La
+// distancia se deriva del tamaño de la pieza para que quepa en el encuadre y se
+// mantiene dentro del rango [DISTANCIA_MIN_ACERCAMIENTO, DISTANCIA_MAX].
+export function calcularAcercamiento(caja, preferido) {
+  if (!caja || caja.isEmpty()) return null
+  const centro = caja.getCenter(new Vector3())
+  const tam = caja.getSize(new Vector3())
+
+  let dirX = 0
+  let dirZ = 1
+  if (preferido) {
+    const dx = preferido.x - centro.x
+    const dz = preferido.z - centro.z
+    const largo = Math.hypot(dx, dz)
+    if (largo > 1e-4) {
+      dirX = dx / largo
+      dirZ = dz / largo
+    }
+  } else if (tam.z > tam.x) {
+    // Pieza más profunda que ancha: se mira desde +X.
+    dirX = 1
+    dirZ = 0
+  }
+
+  // Semiancho de la pieza en la dirección de la mirada: desde el centro hasta
+  // su cara. La distancia final se mide desde el centro para respetar el rango.
+  const medio = (Math.abs(dirX) * tam.x + Math.abs(dirZ) * tam.z) / 2
+  const horizontal = Math.max(tam.x, tam.z)
+  const desdeCara = Math.max(0.9, horizontal * 0.9)
+  const distancia = Math.min(
+    DISTANCIA_MAX_ACERCAMIENTO,
+    Math.max(DISTANCIA_MIN_ACERCAMIENTO, medio + desdeCara),
+  )
+
+  const x = centro.x + dirX * distancia
+  const z = centro.z + dirZ * distancia
+  // Inclinación de la vista hacia el centro de la pieza (permite mirar obras
+  // elevadas o bajas sin perder el centro del encuadre).
+  const pitch = Math.atan2(centro.y - ALTURA_OJO, distancia)
+  return {
+    x,
+    z,
+    rotacionY: Math.atan2(-(centro.x - x), -(centro.z - z)),
+    pitch: Math.max(-1.2, Math.min(1.2, pitch)),
   }
 }
 

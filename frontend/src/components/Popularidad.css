@@ -31,7 +31,7 @@
 
 .popularidad-cabecera__titulo {
   font-family: var(--fuente-titulo, 'Cinzel', serif);
-  font-size: 30px;
+  font-size: clamp(22px, 2.5vw, 30px);
   font-weight: 700;
   color: #1a1714;
   margin: 0;
@@ -69,7 +69,7 @@
 
 .popularidad-stats {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
 }
 
@@ -84,6 +84,7 @@
   gap: 16px;
   box-shadow: 0 4px 20px -8px rgba(33, 25, 15, 0.05);
   overflow: hidden;
+  min-width: 0;
 }
 
 .pop-stat__icono {
@@ -382,16 +383,17 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: 13px;
   color: #736c61;
 }
 
 .pop-select-wrap select {
-  padding: 5px 10px;
-  border-radius: 6px;
+  min-height: 44px;
+  padding: 6px 12px;
+  border-radius: 8px;
   border: 1px solid rgba(33, 25, 15, 0.12);
   background: #faf7f0;
-  font-size: 12px;
+  font-size: 14px;
   color: #1a1714;
   outline: none;
 }
@@ -620,6 +622,7 @@
   border-radius: 10px;
   font-size: 14px;
   font-weight: 500;
+  flex-wrap: wrap;
 }
 
 .popularidad-aviso svg {
@@ -636,12 +639,13 @@
 
 .popularidad-aviso__boton {
   margin-left: auto;
-  padding: 8px 16px;
+  min-height: 44px;
+  padding: 8px 18px;
   border-radius: 999px;
   background: #21190f;
   color: #f7f2e9;
   border: none;
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -654,7 +658,7 @@
 
 @media (max-width: 1150px) {
   .popularidad-stats {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .popularidad-graficas-grid {
@@ -667,12 +671,33 @@
     grid-template-columns: 1fr;
   }
 
+  .popularidad-grafica-card,
+  .popularidad-ranking-card {
+    padding: 18px 16px;
+  }
+
+  .pop-select-wrap {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .pop-select-wrap select {
+    flex: 1;
+    font-size: 16px;
+  }
+
   .pop-donut-wrap {
     flex-direction: column;
   }
 
   .pop-ranking-fila {
     flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .pop-ranking-info {
+    width: auto;
+    flex: 1 1 130px;
   }
 
   .pop-dist-fila {

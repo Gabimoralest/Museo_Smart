@@ -130,12 +130,13 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  min-height: 44px;
   padding: 10px 18px;
   border-radius: 10px;
   border: 1px solid rgba(158, 116, 46, 0.35);
   background: #9e742e;
   color: #ffffff;
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -273,9 +274,10 @@
   position: relative;
   display: flex;
   align-items: center;
-  flex: 1;
-  min-width: 260px;
+  flex: 1 1 260px;
+  min-width: 0;
   max-width: 380px;
+  width: 100%;
 }
 
 .filtro-buscar__icono {
@@ -296,13 +298,13 @@
 
 .filtro-buscar__input {
   width: 100%;
-  height: 40px;
-  padding: 0 34px 0 38px;
+  min-height: 44px;
+  padding: 0 42px 0 38px;
   border-radius: 999px;
   border: 1px solid rgba(33, 25, 15, 0.12);
   background: #ffffff;
   color: #1c1a17;
-  font: 13.5px/1 var(--fuente);
+  font: 14px/1 var(--fuente);
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -318,11 +320,11 @@
 
 .filtro-buscar__limpiar {
   position: absolute;
-  right: 10px;
+  right: 2px;
   display: grid;
   place-items: center;
-  width: 22px;
-  height: 22px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   color: #8c8579;
 }
@@ -354,7 +356,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  height: 40px;
+  min-height: 44px;
   padding: 0 16px;
   border-radius: 999px;
   border: 1px solid rgba(33, 25, 15, 0.12);
@@ -452,9 +454,12 @@
 
 .menu-desplegable__item {
   width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
   padding: 8px 12px;
   border-radius: 8px;
-  font-size: 13px;
+  font-size: 13.5px;
   text-align: left;
   color: #2b2721;
   transition: background 0.15s ease, color 0.15s ease;
@@ -775,11 +780,12 @@
 }
 
 .gestion-exh__vacio-boton {
+  min-height: 44px;
   padding: 10px 20px;
   border-radius: 999px;
   background: #21190f;
   color: #f7f2e9;
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 600;
   transition: background 0.2s ease, transform 0.15s ease;
 }
@@ -912,12 +918,14 @@
   align-items: center;
   justify-content: flex-end;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
 .modal-disp__boton-cancelar {
+  min-height: 44px;
   padding: 9px 18px;
   border-radius: 8px;
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 500;
   color: #5a544b;
   border: 1px solid rgba(33, 25, 15, 0.16);
@@ -931,9 +939,10 @@
 }
 
 .modal-disp__boton-confirmar {
+  min-height: 44px;
   padding: 9px 18px;
   border-radius: 8px;
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 600;
   color: #ffffff;
   transition: background 0.18s ease, transform 0.15s ease;
@@ -957,6 +966,13 @@
 
 /* ===================== Diseño adaptable ===================== */
 
+@media (max-width: 1320px) {
+  .gestion-exh__cuadricula {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+  }
+}
+
 @media (max-width: 1100px) {
   .gestion-exh__cuadricula {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -964,7 +980,7 @@
   }
 
   .gestion-exh__resumen {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -978,9 +994,20 @@
     max-width: 100%;
   }
 
+  .filtro-buscar__input {
+    font-size: 16px;
+  }
+
   .gestion-exh__filtros-grupo {
     width: 100%;
     justify-content: flex-start;
+  }
+
+  .gestion-exh__toast {
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+    border-radius: 14px;
   }
 }
 
@@ -996,6 +1023,30 @@
   }
 
   .gestion-exh__btn-actualizar {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .modal-disp {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .modal-disp__dialogo {
+    max-width: 100%;
+    max-height: 90dvh;
+    overflow-y: auto;
+    border-radius: 20px 20px 0 0;
+    padding: 24px 20px calc(22px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .modal-disp__acciones {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .modal-disp__boton-cancelar,
+  .modal-disp__boton-confirmar {
     width: 100%;
     justify-content: center;
   }
@@ -1045,16 +1096,17 @@
 
 .boton-exh {
   width: 100%;
+  min-height: 44px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 7px;
-  padding: 8.5px 14px;
+  padding: 10px 14px;
   border-radius: 8px;
   border: 1px solid rgba(198, 161, 91, 0.45);
   background: #fffcf8;
   color: #3d3324;
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.18s ease;
@@ -1191,7 +1243,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  height: 40px;
+  min-height: 44px;
   padding: 0 16px;
   border-radius: 999px;
   border: 1px solid rgba(33, 25, 15, 0.12);

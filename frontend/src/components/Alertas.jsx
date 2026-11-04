@@ -109,7 +109,9 @@ function mensajeDeError(error, porDefecto) {
 export default function Alertas() {
   const [alertas, setAlertas] = useState([])
   const [alertaSeleccionadaId, setAlertaSeleccionadaId] = useState(null)
-  const [drawerAbierto, setDrawerAbierto] = useState(true)
+  const [drawerAbierto, setDrawerAbierto] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth > 1024 : true,
+  )
 
   // Estado de la consulta real al backend.
   const [cargando, setCargando] = useState(true)
@@ -404,23 +406,23 @@ export default function Alertas() {
                       className={activa ? 'fila--activa' : ''}
                       onClick={() => seleccionarAlerta(item)}
                     >
-                      <td>{item.fechaHora}</td>
-                      <td>
+                      <td data-label="Fecha y hora">{item.fechaHora}</td>
+                      <td data-label="Severidad">
                         <span className={`alerta-tipo-icono alerta-tipo-icono--${item.estilo}`}>
                           {item.estilo === 'critica' && '!'}
                           {item.estilo === 'advertencia' && <IconoAdvertencia />}
                           {item.estilo === 'resuelta' && <IconoCheck />}
                         </span>
                       </td>
-                      <td className="col-mensaje">{item.mensaje}</td>
-                      <td><code>{item.sensor}</code></td>
-                      <td>{item.tipo}</td>
-                      <td>
+                      <td data-label="Mensaje" className="col-mensaje">{item.mensaje}</td>
+                      <td data-label="Sensor"><code>{item.sensor}</code></td>
+                      <td data-label="Tipo">{item.tipo}</td>
+                      <td data-label="Estado">
                         <span className={`alerta-estado-badge alerta-estado-badge--${item.estilo}`}>
                           ● {item.estado}
                         </span>
                       </td>
-                      <td>
+                      <td data-label="Acciones">
                         <button
                           type="button"
                           className="alerta-btn-accion"
@@ -464,6 +466,12 @@ export default function Alertas() {
 
         {/* Panel lateral: Detalle de Alerta */}
         {drawerAbierto && alertaActual && (
+          <>
+          <div
+            className="alerta-detalle-telon"
+            aria-hidden="true"
+            onClick={() => setDrawerAbierto(false)}
+          />
           <aside className="alerta-detalle-panel" aria-label="Detalle de alerta">
             <header className="alerta-detalle__header">
               <div className="alerta-detalle__header-izq">
@@ -552,6 +560,7 @@ export default function Alertas() {
               )}
             </div>
           </aside>
+          </>
         )}
       </div>
     </div>

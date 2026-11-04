@@ -100,9 +100,21 @@ export default function PanelAdmin({ sesion, onCerrarSesion, onVolverAlMuseo }) 
   useEffect(() => {
     const alCambiarHash = () => {
       setSeccionActual(leerSeccionDeHash())
+      setMenuMovil(false)
+      setMenuPerfil(false)
+    }
+    const alPulsarTecla = (evento) => {
+      if (evento.key === 'Escape') {
+        setMenuMovil(false)
+        setMenuPerfil(false)
+      }
     }
     window.addEventListener('hashchange', alCambiarHash)
-    return () => window.removeEventListener('hashchange', alCambiarHash)
+    window.addEventListener('keydown', alPulsarTecla)
+    return () => {
+      window.removeEventListener('hashchange', alCambiarHash)
+      window.removeEventListener('keydown', alPulsarTecla)
+    }
   }, [])
 
   useEffect(() => {

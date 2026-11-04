@@ -23,7 +23,7 @@
 
 .perfil-cabecera__titulo {
   font-family: var(--fuente-titulo, 'Cinzel', serif);
-  font-size: 30px;
+  font-size: clamp(22px, 2.5vw, 30px);
   font-weight: 700;
   color: #1a1714;
   margin: 0;
@@ -142,10 +142,10 @@
 
 .perfil-avatar-camara {
   position: absolute;
-  bottom: 0;
-  right: 0;
-  width: 26px;
-  height: 26px;
+  bottom: -4px;
+  right: -4px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   background: #1a1714;
   border: 2px solid #ffffff;
@@ -219,14 +219,17 @@
 
 .perfil-campo__input {
   width: 100%;
+  min-height: 46px;
   padding: 10px 14px;
   border-radius: 8px;
   border: 1px solid rgba(33, 25, 15, 0.14);
   background: #ffffff;
-  font-size: 14px;
+  font-size: 16px;
   color: #1a1714;
   outline: none;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  box-sizing: border-box;
+  scroll-margin-bottom: 110px;
 }
 
 .perfil-campo__input:focus {
@@ -249,21 +252,22 @@
 }
 
 .perfil-input-password-wrap .perfil-campo__input {
-  padding-right: 42px;
+  padding-right: 48px;
 }
 
 .perfil-btn-ojo {
   position: absolute;
-  right: 12px;
+  right: 2px;
   background: transparent;
   border: none;
   color: #8c8273;
   cursor: pointer;
   display: grid;
   place-items: center;
-  width: 20px;
-  height: 20px;
-  padding: 0;
+  width: 44px;
+  height: 44px;
+  padding: 10px;
+  border-radius: 8px;
   transition: color 0.2s ease;
 }
 
@@ -504,16 +508,19 @@
 .perfil-btn-actualizar {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
+  min-height: 46px;
   padding: 10px 20px;
   border-radius: 8px;
   background: #9e742e;
   color: #ffffff;
   border: none;
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.2s ease, transform 0.2s ease;
+  scroll-margin-bottom: 40px;
 }
 
 .perfil-btn-actualizar:hover {
@@ -579,5 +586,24 @@
 @media (max-width: 1024px) {
   .perfil-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .perfil-card {
+    padding: 20px 18px;
+  }
+
+  .perfil-accion-wrap {
+    justify-content: stretch;
+  }
+
+  .perfil-btn-actualizar {
+    width: 100%;
+  }
+
+  .cuenta-dato-fila {
+    flex-wrap: wrap;
+    row-gap: 4px;
   }
 }

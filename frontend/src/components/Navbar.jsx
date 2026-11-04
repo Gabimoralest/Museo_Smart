@@ -1,10 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+
+import { RUTAS } from '../data/rutas'
 
 const enlaces = [
-  { etiqueta: 'Inicio', destino: '#inicio', activo: true },
-  { etiqueta: 'Salas', destino: '#salas' },
-  { etiqueta: 'Acerca de', destino: '#acerca' },
-  { etiqueta: 'Vive la experiencia', destino: '#experiencia' },
+  { etiqueta: 'Inicio', destino: RUTAS.inicio, pagina: 'inicio' },
+  { etiqueta: 'Salas', destino: RUTAS.salas, pagina: 'salas' },
+  { etiqueta: 'Acerca de', destino: RUTAS.acerca, pagina: 'acerca' },
+  { etiqueta: 'Vive la experiencia', destino: RUTAS.experiencia, pagina: 'experiencia' },
 ]
 
 function IconoMuseo() {
@@ -23,80 +25,72 @@ function IconoMuseo() {
   )
 }
 
-function IconoUsuario() {
-  return (
-    <svg
-      className="cabecera__acceso-icono"
-      viewBox="0 0 24 24"
-      role="presentation"
-      aria-hidden="true"
-    >
-      <path
-        d="M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9Zm0 2c-4.4 0-8 2.4-8 5.4V21h16v-1.6c0-3-3.6-5.4-8-5.4Z"
-        fill="currentColor"
-      />
-    </svg>
-  )
-}
-
-export default function Navbar({ onIngresar }) {
+export default function Navbar({ paginaActual = 'inicio' }) {
   const [menuAbierto, setMenuAbierto] = useState(false)
+  const [paginaAnterior, setPaginaAnterior] = useState(paginaActual)
+
+  if (paginaAnterior !== paginaActual) {
+    setPaginaAnterior(paginaActual)
+    setMenuAbierto(false)
+  }
 
   const alternarMenu = () => setMenuAbierto((abierto) => !abierto)
   const cerrarMenu = () => setMenuAbierto(false)
 
+  useEffect(() => {
+    if (!menuAbierto) return undefined
+    const alPulsarTecla = (e) => {
+      if (e.key === 'Escape') setMenuAbierto(false)
+    }
+    document.addEventListener('keydown', alPulsarTecla)
+    return () => document.removeEventListener('keydown', alPulsarTecla)
+  }, [menuAbierto])
+
   return (
     <header className="cabecera">
-      <a className="marca" href="#inicio" onClick={cerrarMenu}>
-        <IconoMuseo />
-        <span className="marca__texto">
-          <span className="marca__titulo">
-            MUSEO <strong>SMART</strong>
+      <div className="cabecera__interior">
+        <a className="marca" href={RUTAS.inicio} onClick={cerrarMenu}>
+          <IconoMuseo />
+          <span className="marca__texto">
+            <span className="marca__titulo">
+              MUSEO <strong>SMART</strong>
+            </span>
+            <span className="marca__lema">EXPLORA · APRENDE · DESCUBRE</span>
           </span>
-          <span className="marca__lema">EXPLORA · APRENDE · DESCUBRE</span>
-        </span>
-      </a>
+        </a>
 
-      <button
-        type="button"
-        className="cabecera__hamburguesa"
-        aria-label="Abrir menú de navegación"
-        aria-expanded={menuAbierto}
-        onClick={alternarMenu}
-      >
-        <span />
-        <span />
-        <span />
-      </button>
+        <button
+          type="button"
+          className={`cabecera__hamburguesa${menuAbierto ? ' cabecera__hamburguesa--abierta' : ''}`}
+          aria-label={menuAbierto ? 'Cerrar menú de navegación' : 'Abrir menú de navegación'}
+          aria-expanded={menuAbierto}
+          onClick={alternarMenu}
+        >
+          <span />
+          <span />
+          <span />
+        </button>
 
-      <nav
-        className={`nav${menuAbierto ? ' nav--abierto' : ''}`}
-        aria-label="Navegación principal"
-      >
-        <ul className="nav__lista">
-          {enlaces.map((enlace) => (
-            <li key={enlace.etiqueta}>
-              <a
-                className={`nav__enlace${enlace.activo ? ' nav__enlace--activo' : ''}`}
-                href={enlace.destino}
-                onClick={cerrarMenu}
-              >
-                {enlace.etiqueta}
-              </a>
-            </li>
-          ))}
-        </ul>
-      </nav>
-
-      <button
-        type="button"
-        className="cabecera__acceso"
-        onClick={onIngresar}
-        aria-label="Acceso administrador"
-      >
-        <IconoUsuario />
-        <span>Acceso</span>
-      </button>
+        <nav
+          className={`nav${menuAbierto ? ' nav--abierto' : ''}`}
+          aria-label="Navegación principal"
+        >
+          <ul className="nav__lista">
+            {enlaces.map((enlace) => (
+              <li key={enlace.etiqueta}>
+                <a
+                  className={`nav__enlace${paginaActual === enlace.pagina ? ' nav__enlace--activo' : ''}`}
+                  href={enlace.destino}
+                  aria-current={paginaActual === enlace.pagina ? 'page' : undefined}
+                  onClick={cerrarMenu}
+                >
+                  {enlace.etiqueta}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      </div>
     </header>
   )
 }

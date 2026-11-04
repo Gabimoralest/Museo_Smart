@@ -4,6 +4,7 @@ import { registrarVisita } from '../data/popularidadPublicaApi'
 import { obtenerSesionAnonima } from '../data/sesionAnonima'
 import { urlMedia } from '../data/exhibicionesApi'
 import { ErrorHttp } from '../data/httpClient'
+import { portadasDeSala } from '../data/salasPublicas'
 import FichaVisitante from './FichaVisitante'
 
 function mensajeDeError(error, porDefecto) {
@@ -15,6 +16,35 @@ function mensajeDeError(error, porDefecto) {
   }
   return porDefecto
 }
+/**
+ * Portada de la sala en el modal. Usa las imágenes de `public/salas` por
+ * `codigo3d` y, si falta el archivo, muestra un marcador neutro con el nombre.
+ */
+function ImagenSala({ sala }) {
+  const portadas = portadasDeSala(sala?.codigo3d)
+  const [indice, setIndice] = useState(0)
+  const [sinImagen, setSinImagen] = useState(portadas.length === 0)
+
+  if (sinImagen || !portadas[indice]) {
+    return (
+      <div className="modal__imagen modal__imagen--vacia" role="img" aria-label={`Portada de ${sala?.nombre || 'la sala'}`}>
+        <span>{sala?.nombre}</span>
+      </div>
+    )
+  }
+
+  return (
+    <img
+      className="modal__imagen"
+      src={portadas[indice]}
+      alt=""
+      onError={() => {
+        if (indice + 1 < portadas.length) setIndice(indice + 1)
+        else setSinImagen(true)
+      }}
+    />
+  )
+}
 export default function ModalSala({ sala, onCerrar }) {
   const cerrarRef = useRef(null)
 
@@ -22,6 +52,7 @@ export default function ModalSala({ sala, onCerrar }) {
   const [cargando, setCargando] = useState(false)
   const [errorCarga, setErrorCarga] = useState(null)
   const [seleccionada, setSeleccionada] = useState(null)
+  const [intento, setIntento] = useState(0)
 
   // Carga de las exhibiciones reales de la sala al abrir el modal.
   useEffect(() => {
@@ -46,7 +77,7 @@ export default function ModalSala({ sala, onCerrar }) {
       })
 
     return () => controlador.abort()
-  }, [sala])
+  }, [sala, intento])
 
   // Manejo de teclado / scroll del modal.
   useEffect(() => {
@@ -105,12 +136,14 @@ export default function ModalSala({ sala, onCerrar }) {
           ×
         </button>
 
-        <img className="modal__imagen" src={sala.imagen} alt="" />
+        <ImagenSala key={sala.codigo3d || sala.id} sala={sala} />
 
         <div className="modal__cuerpo">
-          <span className="modal__nombre">{sala.nombre}</span>
+          <span className="modal__nombre">
+            {sala.codigo3d ? sala.codigo3d.replace('_', ' ') : 'Sala'}
+          </span>
           <h3 className="modal__titulo" id="modal-titulo">
-            {sala.titulo}
+            {sala.nombre}
           </h3>
           <p className="modal__descripcion">{sala.descripcion}</p>
 
@@ -135,8 +168,7 @@ export default function ModalSala({ sala, onCerrar }) {
           ) : (
             <>
               <p className="modal__nota">
-                Selecciona una exhibición para conocer su detalle. Recorrer la
-                sala no cuenta como interacción; abrir una exhibición sí.
+                Selecciona una exhibición para conocer su detalle.
               </p>
 
               {cargando && (
@@ -146,9 +178,18 @@ export default function ModalSala({ sala, onCerrar }) {
               )}
 
               {!cargando && errorCarga && (
-                <p className="modal-exhibiciones__estado modal-exhibiciones__estado--error" role="alert">
-                  {errorCarga}
-                </p>
+                <>
+                  <p className="modal-exhibiciones__estado modal-exhibiciones__estado--error" role="alert">
+                    {errorCarga}
+                  </p>
+                  <button
+                    type="button"
+                    className="modal__accion"
+                    onClick={() => setIntento((n) => n + 1)}
+                  >
+                    Reintentar
+                  </button>
+                </>
               )}
 
               {!cargando && !errorCarga && exhibiciones.length === 0 && (

@@ -29,15 +29,37 @@
 
 @media (max-width: 768px) {
   .ficha-visitante--recorrido {
+    position: fixed;
     top: auto;
     bottom: 0;
     left: 0;
     right: 0;
     width: 100%;
-    max-height: 75vh;
+    max-height: 85dvh;
+    z-index: 80;
     border-radius: 16px 16px 0 0;
     border-bottom: none;
     box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.6);
+  }
+}
+
+@media (max-height: 540px) and (orientation: landscape) {
+  .ficha-visitante--recorrido {
+    position: fixed;
+    top: 10px;
+    bottom: 10px;
+    right: 10px;
+    left: auto;
+    width: min(420px, calc(100vw - 20px));
+    max-height: calc(100dvh - 20px);
+    z-index: 80;
+    border-radius: 14px;
+    border-bottom: 1px solid var(--color-borde);
+  }
+
+  .ficha-visitante--recorrido .ficha-visitante__carrusel {
+    min-height: 130px;
+    max-height: 38dvh;
   }
 }
 
@@ -51,23 +73,23 @@
 .ficha-visitante--modal {
   width: 100%;
   margin-top: 16px;
-  max-height: 520px;
+  max-height: min(640px, 76vh);
   background: var(--color-superficie);
 }
 
 /* Botón cerrar */
 .ficha-visitante__cerrar {
   position: absolute;
-  top: 12px;
-  right: 12px;
+  top: 10px;
+  right: 10px;
   z-index: 10;
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: rgba(10, 13, 17, 0.75);
+  background: rgba(10, 13, 17, 0.78);
   border: 1px solid var(--color-borde);
   color: var(--color-crema);
   cursor: pointer;
@@ -75,8 +97,8 @@
 }
 
 .ficha-visitante__cerrar svg {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
 }
 
 .ficha-visitante__cerrar:hover,
@@ -161,15 +183,15 @@
   top: 50%;
   transform: translateY(-50%);
   z-index: 5;
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: rgba(13, 16, 20, 0.7);
+  background: rgba(13, 16, 20, 0.75);
   color: var(--color-crema);
-  font-size: 22px;
+  font-size: 24px;
   line-height: 1;
   border: 1px solid rgba(214, 178, 106, 0.35);
   cursor: pointer;
@@ -208,14 +230,21 @@
 }
 
 .ficha-visitante__punto {
-  width: 8px;
-  height: 8px;
+  position: relative;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   background: rgba(233, 230, 223, 0.4);
   border: none;
   padding: 0;
   cursor: pointer;
   transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.ficha-visitante__punto::after {
+  content: '';
+  position: absolute;
+  inset: -12px;
 }
 
 .ficha-visitante__punto.is-activo {
@@ -250,7 +279,7 @@
 .ficha-visitante__titulo {
   margin: 0;
   font-family: var(--fuente-titulo);
-  font-size: 1.35rem;
+  font-size: clamp(1.2rem, 2.5vw, 1.4rem);
   font-weight: 600;
   color: var(--color-crema);
   line-height: 1.25;
@@ -259,7 +288,7 @@
 /* Cultura o procedencia · Época */
 .ficha-visitante__procedencia {
   margin: -4px 0 0;
-  font-size: 0.88rem;
+  font-size: 0.95rem;
   color: var(--color-oro-claro);
   font-weight: 500;
 }
@@ -267,7 +296,7 @@
 /* Sala · Categoría (ej. "Plaza central · Exhibición especial") */
 .ficha-visitante__sala-cat {
   margin: 0;
-  font-size: 0.75rem;
+  font-size: 0.78rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--color-oro);
@@ -277,8 +306,8 @@
 /* Descripción corta */
 .ficha-visitante__descripcion-corta {
   margin: 2px 0 0;
-  font-size: 0.92rem;
-  line-height: 1.5;
+  font-size: 1rem;
+  line-height: 1.55;
   color: var(--color-texto);
 }
 
@@ -294,7 +323,7 @@
 
 .ficha-visitante__subtitulo {
   margin: 0;
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--color-texto-tenue);
@@ -303,8 +332,8 @@
 
 .ficha-visitante__descripcion-completa {
   margin: 0;
-  font-size: 0.88rem;
-  line-height: 1.55;
+  font-size: 1rem;
+  line-height: 1.6;
   color: var(--color-texto);
   white-space: pre-line;
 }
@@ -312,15 +341,16 @@
 /* Materiales */
 .ficha-visitante__campo {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   gap: 6px;
-  font-size: 0.86rem;
+  font-size: 0.95rem;
   color: var(--color-texto);
   margin-top: 2px;
 }
 
 .ficha-visitante__campo-etiqueta {
-  font-size: 0.75rem;
+  font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--color-texto-tenue);
@@ -343,7 +373,7 @@
 
 .ficha-visitante__dato-curioso-titulo {
   display: block;
-  font-size: 0.75rem;
+  font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -353,8 +383,8 @@
 
 .ficha-visitante__dato-curioso-texto {
   margin: 0;
-  font-size: 0.86rem;
-  line-height: 1.45;
+  font-size: 0.95rem;
+  line-height: 1.5;
   color: var(--color-crema);
   font-style: italic;
 }

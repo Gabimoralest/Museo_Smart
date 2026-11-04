@@ -69,7 +69,7 @@ export default function ModalIngreso({ abierto, onCerrar }) {
           </h3>
           <p className="modal__descripcion">
             Solo el personal autorizado del museo puede ingresar. Los visitantes
-            pueden recorrer las cuatro salas sin registrarse.
+            pueden recorrer las salas sin registrarse.
           </p>
 
           <form className="ingreso" onSubmit={enviar}>

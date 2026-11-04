@@ -1,3 +1,6 @@
+import { useState } from 'react'
+import { portadasDeSala } from '../data/salasPublicas'
+
 function IconoFlecha() {
   return (
     <svg viewBox="0 0 24 24" role="presentation" aria-hidden="true">
@@ -9,19 +12,51 @@ function IconoFlecha() {
   )
 }
 
+// Marcador neutro cuando la sala no tiene imagen de portada: mantiene el nombre
+// visible y el mismo tamaño que una portada real.
+function MarcadorSala({ nombre }) {
+  return (
+    <span className="tarjeta__marcador" role="img" aria-label={`Portada de ${nombre}`}>
+      <span className="tarjeta__marcador-nombre">{nombre}</span>
+    </span>
+  )
+}
+
 export default function TarjetaSala({ sala, onSeleccionar }) {
+  const portadas = portadasDeSala(sala.codigo3d)
+  const [indice, setIndice] = useState(0)
+  const [sinImagen, setSinImagen] = useState(portadas.length === 0)
+
+  // Si el formato actual falla, se prueba el siguiente candidato.
+  const alFallar = () => {
+    if (indice + 1 < portadas.length) setIndice(indice + 1)
+    else setSinImagen(true)
+  }
+
   return (
     <button
       type="button"
       className="tarjeta"
       onClick={() => onSeleccionar(sala)}
-      aria-label={`Abrir ${sala.nombre}: ${sala.titulo}`}
+      aria-label={`Abrir ${sala.nombre}`}
     >
-      <img className="tarjeta__imagen" src={sala.imagen} alt="" />
+      {sinImagen ? (
+        <MarcadorSala nombre={sala.nombre} />
+      ) : (
+        <img
+          className="tarjeta__imagen"
+          src={portadas[indice]}
+          alt=""
+          loading="lazy"
+          onError={alFallar}
+        />
+      )}
       <span className="tarjeta__degradado" aria-hidden="true" />
       <span className="tarjeta__info">
         <span className="tarjeta__nombre">{sala.nombre}</span>
-        <span className="tarjeta__titulo">{sala.titulo}</span>
+        {sala.descripcion && (
+          <span className="tarjeta__titulo">{sala.descripcion}</span>
+        )}
       </span>
       <span className="tarjeta__flecha" aria-hidden="true">
         <IconoFlecha />

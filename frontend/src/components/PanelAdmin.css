@@ -375,8 +375,8 @@
 .topbar__menu-movil {
   display: none;
   place-items: center;
-  width: 42px;
-  height: 42px;
+  width: 44px;
+  height: 44px;
   flex-shrink: 0;
   border-radius: 10px;
   color: var(--p-marron);
@@ -496,8 +496,9 @@
 .perfil__disparador {
   display: flex;
   align-items: center;
+  min-height: 44px;
   gap: 10px;
-  padding: 6px 12px 6px 6px;
+  padding: 5px 12px 5px 6px;
   border-radius: 999px;
   border: 1px solid var(--p-borde);
   background: var(--p-blanco);
@@ -551,6 +552,7 @@
   top: calc(100% + 10px);
   right: 0;
   min-width: 248px;
+  max-width: calc(100vw - 24px);
   padding: 8px;
   border-radius: 12px;
   border: 1px solid var(--p-borde);
@@ -573,7 +575,7 @@
 
 .perfil__menu-correo {
   padding: 8px 12px 10px;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--p-texto-2);
   border-bottom: 1px solid var(--p-borde);
   margin-bottom: 6px;
@@ -584,12 +586,13 @@
 .perfil__menu-item {
   display: flex;
   align-items: center;
+  min-height: 44px;
   gap: 10px;
   width: 100%;
   padding: 10px 12px;
   border-radius: 8px;
   color: var(--p-texto);
-  font-size: 14px;
+  font-size: 15px;
   text-align: left;
   transition: background 0.18s ease, color 0.18s ease;
 }
@@ -1199,11 +1202,10 @@
   .paneles {
     grid-template-columns: 1fr;
   }
-}
 
-@media (max-width: 900px) {
   .panel__lateral {
     width: 264px;
+    max-width: calc(100vw - 48px);
     transform: translateX(-100%);
     box-shadow: rgba(0, 0, 0, 0.4) 0 20px 50px -20px;
   }
@@ -1217,8 +1219,9 @@
   }
 
   .panel--contratido .lateral__marca-texto,
+  .panel--contratido .lateral__marca-textos,
   .panel--contratido .lateral__enlace-texto {
-    display: block;
+    display: flex;
   }
 
   .panel--contratido .lateral__superior {
@@ -1229,6 +1232,10 @@
   .panel--contratido .lateral__enlace {
     justify-content: flex-start;
     padding: 11px 12px;
+  }
+
+  .lateral__enlace {
+    min-height: 44px;
   }
 
   .panel--contratido .lateral__decoracion {
@@ -1262,7 +1269,8 @@
 @media (max-width: 720px) {
   .topbar {
     flex-wrap: wrap;
-    gap: 12px;
+    gap: 10px;
+    padding: 12px 14px;
   }
 
   .topbar__buscador {
@@ -1271,16 +1279,27 @@
     max-width: none;
   }
 
+  .topbar__buscador-input {
+    font-size: 16px;
+  }
+
   .perfil__datos {
     display: none;
   }
 
   .perfil__disparador {
-    padding: 6px;
+    padding: 4px;
+    min-width: 44px;
+    min-height: 44px;
+    justify-content: center;
   }
 
   .perfil__chevron {
     display: none;
+  }
+
+  .panel__principal {
+    padding: 16px 14px 28px;
   }
 }
 

@@ -1,4 +1,5 @@
-import { heroImagen, salas } from '../data/salas'
+import { HERO_IMAGEN } from '../data/salasPublicas'
+import { RUTAS } from '../data/rutas'
 
 function IconoBrujula() {
   return (
@@ -16,31 +17,16 @@ function IconoBrujula() {
   )
 }
 
-export default function Hero({ onSeleccionarSala }) {
+export default function Hero() {
   return (
     <section className="hero" id="inicio">
-      <img className="hero__imagen" src={heroImagen} alt="" />
+      <img className="hero__imagen" src={HERO_IMAGEN} alt="" />
 
       <div className="hero__capa">
-        <ul className="hero__salas" aria-label="Salas del museo">
-          {salas.map((sala) => (
-            <li key={sala.id}>
-              <button
-                type="button"
-                className="hero__sala"
-                onClick={() => onSeleccionarSala(sala)}
-              >
-                <span className="hero__sala-nombre">{sala.etiquetaSala}</span>
-                <span className="hero__sala-titulo">{sala.etiquetaTitulo}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
-
-        <div className="hero__centro" id="experiencia">
+        <div className="hero__centro">
           <h1 className="hero__titulo">MUSEO SMART</h1>
           <p className="hero__lema">UN VIAJE AL CONOCIMIENTO</p>
-          <a className="boton-explorar" href="#/recorrido-virtual">
+          <a className="boton-explorar" href={RUTAS.salas}>
             <IconoBrujula />
             Explora las salas
           </a>

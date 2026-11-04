@@ -35,11 +35,12 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 0;
+  min-height: 44px;
+  padding: 4px 0;
   border: none;
   background: none;
   color: #5c4722;
-  font-size: 0.88rem;
+  font-size: 0.92rem;
   font-weight: 500;
   cursor: pointer;
   transition: color 0.15s ease;
@@ -103,7 +104,7 @@
 .edicion-exh__titulo {
   margin: 0;
   font-family: var(--fuente-titulo);
-  font-size: 2.1rem;
+  font-size: clamp(1.45rem, 2.5vw, 2.1rem);
   font-weight: 700;
   color: #24180f;
   line-height: 1.15;
@@ -119,6 +120,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  min-height: 44px;
   padding: 8px 18px;
   border-radius: 999px;
   background: #fff;
@@ -233,16 +235,18 @@
 .edicion-exh__input,
 .edicion-exh__textarea {
   width: 100%;
+  min-height: 44px;
   padding: 10px 14px;
   border-radius: 8px;
   border: 1px solid #d8cdbc;
   background: #ffffff;
   color: #2b2118;
   font-family: inherit;
-  font-size: 0.94rem;
+  font-size: 1rem;
   line-height: 1.45;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
   box-sizing: border-box;
+  scroll-margin-bottom: 110px;
 }
 
 .edicion-exh__input:focus,
@@ -621,14 +625,16 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 9px 18px;
+  min-height: 44px;
+  padding: 10px 18px;
   border-radius: 8px;
-  font-size: 0.9rem;
+  font-size: 0.92rem;
   font-weight: 600;
   cursor: pointer;
   border: none;
   transition: all 0.15s ease;
   text-decoration: none;
+  box-sizing: border-box;
 }
 
 .edicion-exh__btn svg {
@@ -870,19 +876,22 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
   border-radius: 50%;
   border: none;
   background: #f0ebe2;
   color: #5c4722;
   cursor: pointer;
   transition: background 0.15s ease;
+  flex-shrink: 0;
 }
 
 .edicion-exh__modal-cerrar svg {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
 }
 
 .edicion-exh__modal-cerrar:hover {
@@ -900,6 +909,7 @@
   justify-content: flex-end;
   gap: 12px;
   margin-top: 8px;
+  flex-wrap: wrap;
 }
 
 /* Historial list */
@@ -926,6 +936,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .edicion-exh__historial-tipo {
@@ -954,9 +966,70 @@
   font-size: 0.88rem;
   font-family: monospace;
   color: #2b2118;
+  word-break: break-word;
 }
 
 .edicion-exh__historial-usuario {
   font-size: 0.8rem;
   color: #6a5d4d;
+}
+
+@media (max-width: 640px) {
+  .edicion-exh__tarjeta-cabecera {
+    padding: 16px 18px 12px;
+  }
+
+  .edicion-exh__tarjeta-cuerpo {
+    padding: 18px 16px;
+  }
+
+  .edicion-exh__pie {
+    justify-content: stretch;
+  }
+
+  .edicion-exh__pie-acciones {
+    width: 100%;
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .edicion-exh__pie-acciones .edicion-exh__btn {
+    width: 100%;
+  }
+
+  .edicion-exh__video-botones {
+    width: 100%;
+  }
+
+  .edicion-exh__video-botones .edicion-exh__btn {
+    flex: 1 1 auto;
+  }
+
+  .edicion-exh__modal {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .edicion-exh__modal-dialogo,
+  .edicion-exh__modal-dialogo--ancho {
+    max-width: 100%;
+    max-height: 90dvh;
+    border-radius: 20px 20px 0 0;
+    padding: 20px 18px calc(20px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .edicion-exh__modal-acciones {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .edicion-exh__modal-acciones .edicion-exh__btn {
+    width: 100%;
+  }
+
+  .edicion-exh__toast-exito {
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+  }
 }

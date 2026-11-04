@@ -752,15 +752,15 @@ export default function MonitoreoIoT() {
               <tbody>
                 {lecturasPaginadas.map((lec) => (
                   <tr key={`${lec.sensorId}-${lec.metrica}`}>
-                    <td>{formatearFecha(lec.medidoEn)}</td>
-                    <td><code>{lec.sensorCodigo}</code></td>
-                    <td>{lec.sala || lec.exhibicion || '—'}</td>
-                    <td>{etiquetaMetrica(lec.metrica)}</td>
-                    <td>
+                    <td data-label="Fecha y hora">{formatearFecha(lec.medidoEn)}</td>
+                    <td data-label="Sensor"><code>{lec.sensorCodigo}</code></td>
+                    <td data-label="Sala / Exhibición">{lec.sala || lec.exhibicion || '—'}</td>
+                    <td data-label="Métrica">{etiquetaMetrica(lec.metrica)}</td>
+                    <td data-label="Valor">
                       {Number(lec.valor).toFixed(1)}
                       {lec.unidad ? ` ${lec.unidad}` : ''}
                     </td>
-                    <td>
+                    <td data-label="Estado envío">
                       <span className="monitoreo-badge-conectado">{lec.estadoOutbox}</span>
                     </td>
                   </tr>

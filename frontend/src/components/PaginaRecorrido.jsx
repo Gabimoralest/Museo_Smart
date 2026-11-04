@@ -6,10 +6,10 @@ import './PaginaRecorrido.css'
 // Vista independiente (#/recorrido-virtual). Reutiliza la cabecera y el pie del
 // sitio para conservar el diseño y la navegación, y no monta nada del resto de
 // la página de inicio (no se duplica el visor).
-export default function PaginaRecorrido({ onVolver, onIngresar }) {
+export default function PaginaRecorrido({ onVolver, sesion }) {
   return (
     <div className="app">
-      <Navbar onIngresar={onIngresar} />
+      <Navbar paginaActual="experiencia" />
 
       <main className="app__principal">
         <div className="pagina-recorrido">
@@ -33,7 +33,7 @@ export default function PaginaRecorrido({ onVolver, onIngresar }) {
         </div>
       </main>
 
-      <Footer />
+      <Footer sesion={sesion} />
     </div>
   )
 }
