@@ -20,6 +20,71 @@ código**: basta con que el nuevo modelo respete el contrato de abajo.
 | Salas | Vacíos `SALA_1` … `SALA_6`. |
 | IDs únicos | No puede repetirse ningún `EXH_*`. |
 
+## Convención de colisiones
+
+El visor calcula las colisiones con `raycast` contra la geometría real (BVH de
+`three-mesh-bvh`), así que el modelo debe nombrar la arquitectura de forma
+predecible. Se aceptan **dos convenciones**; si existen cajas `COL_*`, mandan
+sobre todo lo demás.
+
+### Opción A — prefijos de nombre (la que usa el modelo actual)
+
+| Prefijo | Se usa para colisionar |
+|---|---|
+| `Muro_` | Muros interiores y exteriores. |
+| `Fachada_` | Fachada y su dintel (define además la aparición del visitante). |
+| `Revestimiento` | Revestimientos que forman pared (incluye `Revestimiento.001`, etc.). |
+| `Division`, `Pared` | Divisiones y tabiques. |
+| `Pedestal`, `Base`, `Vitrina`, `Vidrio` | Vitrinas y pedestales. |
+| `Columna_`, `Pilastra_`, `Pilar_` | Columnas, pilastras y pilares estructurales. |
+
+Las vitrinas de las exhibiciones se llaman `EXH_Sx_0y_Vidrio`, `EXH_Sx_0y_Plinto`
+o `EXH_Sx_0y_Poste`; el visor las reconoce como vitrinas y también colisionan.
+
+Nunca colisionan, aunque su nombre coincida: `InstancedMesh` (plantas y
+vegetación), pisos, techos, lámparas, cables, cuadros, marcos, carteles y
+cualquier malla de menos de 0,3 m de altura.
+
+`Puerta_Hoja` y `Puerta_Vidrio` solo colisionan si están **cerradas** sobre el
+vano. El visor compara la orientación del panel con el eje de la fachada: una
+hoja girada perpendicular a la fachada está abierta y no frena al visitante.
+
+### Opción B — cajas invisibles `COL_*` (recomendada para modelos nuevos)
+
+Si el modelo trae objetos cuyo nombre empieza por `COL_` (normalmente cajas
+creadas en Blender para definir el volumen de colisión), el visor **ignora el
+resto de la escena para el movimiento**: solo esas cajas colisionan y se ocultan
+automáticamente al cargar. Es la opción más robusta porque desacopla la
+colisión del aspecto visible del modelo.
+
+Para usarla:
+
+1. En Blender, crear cubos llamados `COL_Pared_01`, `COL_Vitrina_S2_01`, etc.
+2. Ajustar cada cubo al volumen que debe frenar al visitante (pueden solaparse).
+3. Exportarlos en el mismo GLB con el resto del museo.
+
+El visor informa en la consola de desarrollo (`[recorrido 3D] colisiones`) del
+modo activo (`COL_*` o `prefijos`) y del número de mallas usadas.
+
+## Depuración de colisiones
+
+Abrir el recorrido añadiendo `?debug=colisiones` a la dirección **antes** del
+hash, por ejemplo:
+
+```
+http://localhost:5173/?debug=colisiones#/recorrido-virtual
+```
+
+(La navegación interna usa el hash tal cual, `#/recorrido-virtual`; por eso el
+parámetro va en la query real y no dentro del hash.)
+
+Con ese parámetro:
+
+- se dibujan en alambre verde las mallas que se usan para colisionar;
+- la consola muestra `[recorrido 3D debug] bloquea: <nombre>` cada vez que un
+  objeto impide avanzar (como máximo una línea por objeto y segundo);
+- la consola muestra la posición actual `x, z` cada 2 segundos.
+
 ## Pasos
 
 ### 1. Etiquetar en Blender

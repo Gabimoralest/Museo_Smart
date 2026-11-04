@@ -13,16 +13,22 @@ import { useGLTF, useProgress } from '@react-three/drei'
 import { Box3, Euler, Vector3 } from 'three'
 import {
   ALTURA_OJO,
-  APARICION,
+  APARICION_PROVISIONAL,
   CLAVE_EXHIBICION_ID,
   COLOR_RESALTE,
-  LIMITES,
   MODELO_URL,
-  RADIO_JUGADOR,
   SENSIBILIDAD,
   VELOCIDAD,
-  esColision,
+  calcularAparicion,
+  calcularLimites,
 } from '../data/museo3d'
+import {
+  crearAyudasDebug,
+  crearDetector,
+  fueraDeLimites,
+  liberarColisiones,
+  prepararColisiones,
+} from '../data/colisiones3d'
 import { listarTodasExhibicionesPublicas } from '../data/exhibicionesPublicasApi'
 import { registrarVisita, FUENTE_CURSOR } from '../data/popularidadPublicaApi'
 import { primeraVista, exhibicionMostrable } from '../data/fichaExhibicion'
@@ -32,14 +38,11 @@ import './RecorridoMuseo.css'
 
 const MAX_PITCH = Math.PI / 2 - 0.08
 
-// Altura aproximada del cuerpo del visitante. Las cajas por encima de esta cota
-// (marcos superiores de puertas, dinteles) no deben bloquear el paso.
-const ALTURA_CUERPO = 1.8
-
 // Configuración estable del lienzo. Al declararla fuera del componente, R3F no
 // detecta cambios en cada render y evita reconfigurar el renderizador/cámara.
+// La posición real se calcula al cargar el modelo (ver `calcularAparicion`).
 const CAMARA_INICIAL = {
-  position: [APARICION.x, ALTURA_OJO, APARICION.z],
+  position: [APARICION_PROVISIONAL.x, ALTURA_OJO, APARICION_PROVISIONAL.z],
   fov: 70,
   near: 0.1,
   far: 100,
@@ -57,23 +60,16 @@ const alCrearLienzo = ({ gl }) => {
   gl.transmissionResolutionScale = ESCALA_TRANSMISION
 }
 
-// ¿La posición (x, z) del jugador está libre de colisiones arquitectónicas?
-function posicionLibre(x, z, colisiones) {
-  if (x < LIMITES.xMin || x > LIMITES.xMax || z < LIMITES.zMin || z > LIMITES.zMax) {
-    return false
-  }
-  for (const caja of colisiones) {
-    if (caja.max.y <= 0.2 || caja.min.y >= ALTURA_CUERPO) continue
-    if (
-      x > caja.min.x - RADIO_JUGADOR &&
-      x < caja.max.x + RADIO_JUGADOR &&
-      z > caja.min.z - RADIO_JUGADOR &&
-      z < caja.max.z + RADIO_JUGADOR
-    ) {
-      return false
-    }
-  }
-  return true
+// ¿El visitante pidió el modo de depuración con ?debug=colisiones? Se admiten
+// las dos formas habituales: en la query real (`/?debug=colisiones#/…`) y dentro
+// del hash (`#/recorrido-virtual?debug=colisiones`).
+function depuracionActiva() {
+  if (typeof window === 'undefined') return false
+  const enQuery = new URLSearchParams(window.location.search).get('debug')
+  const hash = window.location.hash || ''
+  const indice = hash.indexOf('?')
+  const enHash = indice >= 0 ? new URLSearchParams(hash.slice(indice + 1)).get('debug') : null
+  return enQuery === 'colisiones' || enHash === 'colisiones'
 }
 
 function materialesDe(malla) {
@@ -122,12 +118,15 @@ function EscenaMuseo({
   exhibicionesPorUbicacion,
 }) {
   const { scene } = useGLTF(MODELO_URL)
-  const { gl, camera, raycaster } = useThree()
+  const { gl, camera, raycaster, invalidate } = useThree()
 
   const grupoRef = useRef(null)
   const clon = useMemo(() => scene.clone(true), [scene])
   const inicializadoRef = useRef(false)
-  const colisionesRef = useRef([])
+  const detectorRef = useRef(null)
+  const limitesRef = useRef(null)
+  const aparicionRef = useRef({ ...APARICION_PROVISIONAL })
+  const preparacionRef = useRef(null)
   const anclasRef = useRef([])
   const anclasMapaRef = useRef(new Map())
   // Ubicaciones clicables = las que tienen una exhibición activa en la API.
@@ -139,31 +138,36 @@ function EscenaMuseo({
   const seleccionadoRef = useRef(null)
 
   const teclasRef = useRef({ adelante: false, atras: false, izq: false, der: false })
-  const yawRef = useRef(APARICION.rotacionY)
+  const yawRef = useRef(APARICION_PROVISIONAL.rotacionY)
   const pitchRef = useRef(0)
   const eulerRef = useRef(new Euler(0, 0, 0, 'YXZ'))
   const direccionRef = useRef(new Vector3())
   const lateralRef = useRef(new Vector3())
   const impactoRef = useRef(new Vector3())
 
+  // Estado del modo de depuración (?debug=colisiones). Se decide una vez al
+  // montar; el grupo de ayudas solo existe si está activo.
+  const modoDebug = useMemo(() => depuracionActiva(), [])
+  const debugRef = useRef({ activo: modoDebug, avisos: new Map(), ultimoPos: 0 })
+
   // Preparación del modelo:
   //   1. Construye un índice ubicacionId -> ancla recorriendo la escena y
   //      leyendo `userData.exhibicion_id` (extras del GLB). Nada de nombres de
   //      nodo en duro.
-  //   2. Genera colisiones para la arquitectura (por prefijo de nombre).
+  //   2. Calcula límites y aparición a partir de la geometría de la fachada.
+  //   3. Prepara las colisiones precisas con BVH (o COL_* si existen).
   //
   // No altera el GLB original: trabaja sobre un clon en memoria que comparte
   // geometría con el original (three no duplica geometría en Object3D.clone).
   //
-  // Para el apuntado NO se recorren los ~900.000 triángulos del modelo en cada
-  // frame; basta con la caja envolvente de cada pieza, que es una operación
+  // Para el apuntado NO se recorren los ~1.000.000 de triángulos del modelo en
+  // cada frame; basta con la caja envolvente de cada pieza, que es una operación
   // prácticamente instantánea.
   useLayoutEffect(() => {
     const grupo = grupoRef.current
     if (!grupo) return
     grupo.updateWorldMatrix(true, true)
 
-    const colisiones = []
     const anclas = new Map()
     // La anisotropía mejora la nitidez de texturas vistas en ángulo rasante
     // (suelo, paredes, cuadros) sin reemplazar el GLB. Se limita al máximo que
@@ -197,7 +201,6 @@ function EscenaMuseo({
       }
 
       if (!objeto.isMesh) return
-      const nombre = objeto.name
 
       // Asocia la malla con su ancla de exhibición (subiendo por .parent).
       // Esto permite resaltar todas las mallas de una pieza conectada.
@@ -222,10 +225,6 @@ function EscenaMuseo({
       }
 
       for (const material of materialesDe(objeto)) aplicarCalidad(material)
-
-      if (esColision(nombre)) {
-        colisiones.push(new Box3().setFromObject(objeto))
-      }
     })
 
     // Caja envolvente por ancla (para el apuntado barato y el clic por caja).
@@ -237,10 +236,86 @@ function EscenaMuseo({
       listaAnclas.push({ ubicacionId: ancla.ubicacionId, mallas: ancla.mallas, caja, duplicado: ancla.duplicado })
     }
 
-    colisionesRef.current = colisiones
+    // Límites y aparición derivados de la geometría real del modelo.
+    limitesRef.current = calcularLimites(clon)
+    aparicionRef.current = calcularAparicion(clon)
+
+    // Colisiones precisas contra la geometría (BVH) de las mallas válidas.
+    preparacionRef.current = prepararColisiones(clon)
+    detectorRef.current = crearDetector(preparacionRef.current.proxies)
+    if (import.meta.env.DEV) {
+      const { modo, mallas, proxies, puertas } = preparacionRef.current
+      console.info('[recorrido 3D] colisiones', {
+        modo,
+        mallas: mallas.length,
+        proxies: proxies.length,
+        puertas,
+        limites: limitesRef.current,
+        aparicion: aparicionRef.current,
+      })
+    }
+
     anclasRef.current = listaAnclas
     anclasMapaRef.current = anclas
+
+    return () => {
+      liberarColisiones(preparacionRef.current)
+      preparacionRef.current = null
+      detectorRef.current = null
+    }
   }, [clon, gl])
+
+  // Encuadra la portada frente a la puerta en cuanto se conoce la geometría, y
+  // deja la cámara lista para el primer fotograma. `invalidate` fuerza un
+  // repintado aunque el lienzo esté en modo `demand` antes de capturar el cursor.
+  useLayoutEffect(() => {
+    if (inicializadoRef.current) return
+    const aparicion = aparicionRef.current
+    camera.position.set(aparicion.x, ALTURA_OJO, aparicion.z)
+    yawRef.current = aparicion.rotacionY
+    eulerRef.current.set(0, aparicion.rotacionY, 0)
+    camera.quaternion.setFromEuler(eulerRef.current)
+    invalidate()
+  }, [camera, clon, invalidate])
+
+  // Informa por consola del objeto que bloquea, como máximo una vez por objeto
+  // y segundo, para no inundar la consola mientras se camina pegado a una pared.
+  const registrarBloqueo = useCallback((malla) => {
+    const nombre = malla?.name || '(sin nombre)'
+    const ahora = performance.now()
+    const avisos = debugRef.current.avisos
+    if (ahora - (avisos.get(nombre) ?? -Infinity) < 1000) return
+    avisos.set(nombre, ahora)
+    console.info(`[recorrido 3D debug] bloquea: ${nombre}`)
+  }, [])
+
+  // Modo de depuración (?debug=colisiones): dibuja en wireframe las mallas que
+  // se usan para colisionar, compartiendo su geometría real. Las ayudas viven en
+  // un grupo propio gestionado por React; se añaden de forma imperativa para no
+  // tocar el grupo del modelo.
+  const debugGrupoRef = useRef(null)
+  useLayoutEffect(() => {
+    const activoDebug = modoDebug
+    debugRef.current.activo = activoDebug
+    const contenedor = debugGrupoRef.current
+    if (!activoDebug || !contenedor) return undefined
+    const preparacion = preparacionRef.current
+    if (!preparacion) return undefined
+
+    const { material, objetos } = crearAyudasDebug(preparacion.proxies)
+    for (const objeto of objetos) contenedor.add(objeto)
+    console.info('[recorrido 3D debug] colisiones dibujadas', {
+      mallas: objetos.length,
+      modo: preparacion.modo,
+      puertas: preparacion.puertas,
+    })
+    invalidate()
+    return () => {
+      for (const objeto of objetos) contenedor.remove(objeto)
+      material.dispose()
+      invalidate()
+    }
+  }, [clon, modoDebug, invalidate])
 
   // Resumen de desarrollo: cruza los IDs etiquetados en el modelo con el
   // catálogo de la API. Se recalcula cuando cualquiera de los dos está listo
@@ -277,12 +352,14 @@ function EscenaMuseo({
 
   // Posición inicial: solo la primera vez que se entra en el recorrido. No se
   // reinicia al liberar el cursor (por ejemplo, al alternar pantalla completa),
-  // de modo que se conserva la posición y la orientación de la cámara.
+  // de modo que se conserva la posición y la orientación de la cámara. La
+  // posición y el giro provienen de la geometría de la fachada, no de constantes.
   useLayoutEffect(() => {
     if (!activo || inicializadoRef.current) return
     inicializadoRef.current = true
-    camera.position.set(APARICION.x, ALTURA_OJO, APARICION.z)
-    yawRef.current = APARICION.rotacionY
+    const aparicion = aparicionRef.current
+    camera.position.set(aparicion.x, ALTURA_OJO, aparicion.z)
+    yawRef.current = aparicion.rotacionY
     pitchRef.current = 0
   }, [activo, camera])
 
@@ -447,18 +524,41 @@ function EscenaMuseo({
       const paso = (VELOCIDAD * dt) / largo
       const dx = dirTemp.current.x * paso
       const dz = dirTemp.current.z * paso
-      const colisiones = colisionesRef.current
+      const detector = detectorRef.current
+      const limites = limitesRef.current
+      // Ejes por separado: al bloquear uno, el otro sigue y el visitante se
+      // desliza por la pared en lugar de quedarse clavado.
       const destinoX = camara.position.x + dx
-      if (posicionLibre(destinoX, camara.position.z, colisiones)) {
-        camara.position.x = destinoX
+      if (!fueraDeLimites(destinoX, camara.position.z, limites)) {
+        const bloqueoX = detector?.bloquea(camara.position.x, camara.position.z, dx, 0, Math.abs(dx))
+        if (!bloqueoX) {
+          camara.position.x = destinoX
+        } else if (debugRef.current.activo) {
+          registrarBloqueo(bloqueoX)
+        }
       }
       const destinoZ = camara.position.z + dz
-      if (posicionLibre(camara.position.x, destinoZ, colisiones)) {
-        camara.position.z = destinoZ
+      if (!fueraDeLimites(camara.position.x, destinoZ, limites)) {
+        const bloqueoZ = detector?.bloquea(camara.position.x, camara.position.z, 0, dz, Math.abs(dz))
+        if (!bloqueoZ) {
+          camara.position.z = destinoZ
+        } else if (debugRef.current.activo) {
+          registrarBloqueo(bloqueoZ)
+        }
       }
     }
 
     camara.position.y = ALTURA_OJO
+
+    if (debugRef.current.activo) {
+      const ahora = state.clock.elapsedTime
+      if (ahora - debugRef.current.ultimoPos >= 2) {
+        debugRef.current.ultimoPos = ahora
+        console.info(
+          `[recorrido 3D debug] posición x=${camara.position.x.toFixed(2)} z=${camara.position.z.toFixed(2)}`,
+        )
+      }
+    }
 
     // Apuntado por caja envolvente: barato y suficiente para el resalte.
     // Solo se consideran anclas que correspondan a una exhibición activa; el
@@ -491,6 +591,7 @@ function EscenaMuseo({
   return (
     <group ref={grupoRef}>
       <primitive object={clon} />
+      {modoDebug && <group ref={debugGrupoRef} name="DEBUG_colisiones" />}
     </group>
   )
 }
