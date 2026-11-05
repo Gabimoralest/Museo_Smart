@@ -3,6 +3,7 @@ package com.museosmart.iot.influx;
 import com.museosmart.entity.MedicionPendiente;
 import com.museosmart.iot.IotInfluxProperties;
 import com.museosmart.repository.MedicionPendienteRepository;
+import com.museosmart.repository.redis.EstadoSensorRedisRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -31,6 +32,9 @@ class MedicionEnvioServiceTest {
     @Mock
     private InfluxEscritor escritor;
 
+    @Mock
+    private EstadoSensorRedisRepository estadoSensorRedis;
+
     private MedicionEnvioService service;
     private IotInfluxProperties propiedades;
 
@@ -39,7 +43,7 @@ class MedicionEnvioServiceTest {
         propiedades = new IotInfluxProperties();
         propiedades.setMaxIntentos(3);
         propiedades.setReintentoSegundos(30);
-        service = new MedicionEnvioService(repository, escritor, propiedades);
+        service = new MedicionEnvioService(repository, escritor, propiedades, estadoSensorRedis);
     }
 
     private MedicionPendiente pendiente() {

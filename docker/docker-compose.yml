@@ -1,7 +1,7 @@
 # ============================================================
 # Museo_Smart - Infraestructura IoT local (Docker Compose)
 # ------------------------------------------------------------
-# Servicios: Node-RED, Mosquitto (MQTT), Redis, InfluxDB.
+# Servicios: Node-RED, Mosquitto (MQTT), InfluxDB y Redis (estado actual).
 # PostgreSQL y Spring Boot NO se incluyen (se ejecutan fuera de Docker).
 #
 # Uso desde PowerShell (desde la carpeta docker/):
@@ -26,6 +26,7 @@ services:
     image: eclipse-mosquitto:2.0.20
     container_name: museosmart-mosquitto
     restart: unless-stopped
+    mem_limit: 64m
     entrypoint: ["/mosquitto/entrypoint.sh"]
     ports:
       # Solo el puerto MQTT con autenticacion. Sin websockets ni admin.
@@ -57,6 +58,7 @@ services:
     image: nodered/node-red:4.0.9
     container_name: museosmart-nodered
     restart: unless-stopped
+    mem_limit: 256m
     depends_on:
       mosquitto:
         condition: service_healthy
@@ -93,17 +95,25 @@ services:
       start_period: 30s
 
   # ----------------------------------------------------------
-  # Redis - estado actual de sensores (incluye persistencia AOF)
+  # Redis - ESTADO ACTUAL de sensores y alertas (capa volatil).
+  # No es fuente de verdad: PostgreSQL conserva los datos permanentes.
+  # Es una cache: sin persistencia, con maxmemory y politica allkeys-lru.
+  # El backend funciona igual si Redis cae (usa PostgreSQL como respaldo).
   # ----------------------------------------------------------
   redis:
     image: redis:7.4.1
     container_name: museosmart-redis
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD}"]
+    mem_limit: 64m
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD}
+      --maxmemory 48mb
+      --maxmemory-policy allkeys-lru
+      --save ""
+      --appendonly no
     ports:
       - "${REDIS_HOST_PORT:-6380}:6379"
-    volumes:
-      - redis_data:/data
     networks:
       - museosmart-iot
     healthcheck:
@@ -121,6 +131,7 @@ services:
     image: influxdb:2.7.11
     container_name: museosmart-influxdb
     restart: unless-stopped
+    mem_limit: 768m
     ports:
       - "${INFLUX_HOST_PORT:-8087}:8086"
     environment:
@@ -131,6 +142,9 @@ services:
       DOCKER_INFLUXDB_INIT_BUCKET: ${INFLUX_BUCKET}
       DOCKER_INFLUXDB_INIT_RETENTION: 90d
       DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUX_TOKEN}
+      # Acota la cache en memoria de InfluxDB (por defecto puede llegar a 1 GB).
+      GOMEMLIMIT: 384MiB
+      INFLUXD_STORAGE_CACHE_MAX_MEMORY_SIZE: 256m
     volumes:
       - influxdb_data:/var/lib/influxdb2
       - influxdb_config:/etc/influxdb2
@@ -150,8 +164,6 @@ volumes:
     name: museosmart_mosquitto_log
   nodered_data:
     name: museosmart_nodered_data
-  redis_data:
-    name: museosmart_redis_data
   influxdb_data:
     name: museosmart_influxdb_data
   influxdb_config:

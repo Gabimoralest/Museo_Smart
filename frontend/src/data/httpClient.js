@@ -58,9 +58,10 @@ function construirError(cuerpo, estado) {
  * @param {object} [opciones.datos]      Cuerpo a serializar como JSON.
  * @param {boolean} [opciones.autenticado=false] Añade Authorization: Bearer.
  * @param {AbortSignal} [opciones.signal]
+ * @param {number} [opciones.tiempoLimiteMs] Aborta la petición si tarda más.
  */
 export async function solicitarJson(ruta, opciones = {}) {
-  const { method = 'GET', datos, autenticado = false, signal } = opciones
+  const { method = 'GET', datos, autenticado = false, signal, tiempoLimiteMs } = opciones
 
   const headers = {}
   if (datos !== undefined) headers['Content-Type'] = 'application/json'
@@ -80,17 +81,45 @@ export async function solicitarJson(ruta, opciones = {}) {
 
   const url = ruta.startsWith('http') ? ruta : `${API_BASE}${ruta}`
 
+  // Límite de tiempo opcional: evita que un endpoint lento (p. ej. Redis o
+  // InfluxDB colgados) deje la interfaz cargando indefinidamente.
+  const controlador = new AbortController()
+  let tiempoAgotado = false
+  let temporizador = null
+  const alAbortarExterno = () => controlador.abort()
+  if (signal) {
+    if (signal.aborted) controlador.abort()
+    else signal.addEventListener('abort', alAbortarExterno, { once: true })
+  }
+  if (tiempoLimiteMs > 0) {
+    temporizador = setTimeout(() => {
+      tiempoAgotado = true
+      controlador.abort()
+    }, tiempoLimiteMs)
+  }
+
   let respuesta
   try {
     respuesta = await fetch(url, {
       method,
       headers,
       body: datos !== undefined ? JSON.stringify(datos) : undefined,
-      signal,
+      signal: controlador.signal,
     })
   } catch (error) {
-    if (error?.name === 'AbortError') throw error
+    if (error?.name === 'AbortError') {
+      if (tiempoAgotado) {
+        throw new ErrorHttp('El servidor tardó demasiado en responder. Inténtalo de nuevo.', {
+          estado: 0,
+          tipo: 'conexion',
+        })
+      }
+      throw error
+    }
     throw errorDeConexion()
+  } finally {
+    if (temporizador) clearTimeout(temporizador)
+    if (signal) signal.removeEventListener('abort', alAbortarExterno)
   }
 
   let cuerpo = null

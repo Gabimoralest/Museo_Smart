@@ -6,11 +6,16 @@
 //
 // Endpoints reales del backend (ver AlertaController):
 //   GET   /api/v1/admin/alertas?todas={bool} -> AlertaResponse[]
+//   GET   /api/v1/admin/alertas/resumen       -> { abiertas }
 //   PATCH /api/v1/admin/alertas/{id}/resolver -> AlertaResponse
 //
 // Requiere rol ADMIN o SUPERADMIN (Spring Security).
 // ============================================================
 import { solicitarAdmin } from './adminApi'
+
+// Ninguna consulta debe quedar colgada (Redis caído, etc.). Al agotarse el
+// tiempo se lanza un ErrorHttp de conexión y la vista muestra Reintentar.
+const TIEMPO_LIMITE_MS = 15_000
 
 /**
  * Lista alertas. Por defecto solo las activas (ABIERTA/RECONOCIDA); con
@@ -20,7 +25,25 @@ import { solicitarAdmin } from './adminApi'
  */
 export function listarAlertas({ todas = false, signal } = {}) {
   const query = todas ? '?todas=true' : ''
-  return solicitarAdmin(`/admin/alertas${query}`, { method: 'GET', signal })
+  return solicitarAdmin(`/admin/alertas${query}`, {
+    method: 'GET',
+    signal,
+    tiempoLimiteMs: TIEMPO_LIMITE_MS,
+  })
+}
+
+/**
+ * Numero de alertas activas (ABIERTA/RECONOCIDA) para la campana del panel.
+ * El backend lo lee de Redis (o PostgreSQL si Redis no responde).
+ * @param {{signal?: AbortSignal}} [opciones]
+ * @returns {Promise<{abiertas: number}>}
+ */
+export function obtenerResumenAlertas({ signal } = {}) {
+  return solicitarAdmin('/admin/alertas/resumen', {
+    method: 'GET',
+    signal,
+    tiempoLimiteMs: TIEMPO_LIMITE_MS,
+  })
 }
 
 /**

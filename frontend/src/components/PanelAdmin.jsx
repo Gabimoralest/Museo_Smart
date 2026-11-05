@@ -16,6 +16,7 @@ import {
   IconoChevronIzquierda,
 } from './iconos'
 import { secciones, imagenesPanel } from '../data/panelSuperAdmin'
+import { obtenerResumenAlertas } from '../data/alertasApi'
 
 // Subvistas administrativas
 import InicioDashboard from './InicioDashboard'
@@ -95,6 +96,29 @@ export default function PanelAdmin({ sesion, onCerrarSesion, onVolverAlMuseo }) 
   })
   const [menuMovil, setMenuMovil] = useState(false)
   const [menuPerfil, setMenuPerfil] = useState(false)
+
+  // Alertas activas reales para la campana. Se consulta al montar y cada 30 s.
+  // Si la consulta falla (p. ej. backend caido) se conserva el ultimo valor.
+  const [alertasAbiertas, setAlertasAbiertas] = useState(0)
+
+  useEffect(() => {
+    const controlador = new AbortController()
+    const cargar = async () => {
+      try {
+        const resumen = await obtenerResumenAlertas({ signal: controlador.signal })
+        const total = Number(resumen?.abiertas)
+        setAlertasAbiertas(Number.isFinite(total) && total > 0 ? total : 0)
+      } catch (error) {
+        if (error?.name === 'AbortError') return
+      }
+    }
+    cargar()
+    const intervalo = setInterval(cargar, 30_000)
+    return () => {
+      controlador.abort()
+      clearInterval(intervalo)
+    }
+  }, [seccionActual])
 
   // Sincronizar sección con cambios de hash en el navegador
   useEffect(() => {
@@ -256,16 +280,22 @@ export default function PanelAdmin({ sesion, onCerrarSesion, onVolverAlMuseo }) 
             <button
               type="button"
               className="topbar__notificaciones"
-              aria-label="Notificaciones (3 sin leer)"
+              aria-label={
+                alertasAbiertas > 0
+                  ? `Notificaciones (${alertasAbiertas} sin resolver)`
+                  : 'Notificaciones (sin alertas activas)'
+              }
               onClick={() => {
                 navegar('#/admin/alertas')
                 setSeccionActual('alertas')
               }}
             >
               <IconoCampana />
-              <span className="topbar__badge" aria-hidden="true">
-                3
-              </span>
+              {alertasAbiertas > 0 && (
+                <span className="topbar__badge" aria-hidden="true">
+                  {alertasAbiertas}
+                </span>
+              )}
             </button>
 
             <div className="topbar__perfil">

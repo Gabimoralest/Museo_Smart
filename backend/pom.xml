@@ -77,6 +77,14 @@
             <version>1.2.5</version>
         </dependency>
 
+        <!-- Redis (Lettuce): estado actual de sensores y conteo de alertas.
+             Redis es una capa de datos VOLATIL: si no esta disponible, la
+             aplicacion sigue funcionando con PostgreSQL (ver RedisConfig). -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+
         <!-- Cliente InfluxDB 2.x (drenado del outbox medicion_pendiente) -->
         <dependency>
             <groupId>com.influxdb</groupId>

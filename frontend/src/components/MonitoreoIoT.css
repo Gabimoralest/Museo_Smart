@@ -194,6 +194,10 @@
   min-width: 0;
 }
 
+.monitoreo-grafica-card--ancho {
+  grid-column: 1 / -1;
+}
+
 .monitoreo-grafica-card {
   position: relative;
   background: #ffffff;
@@ -207,44 +211,6 @@
   overflow: hidden;
 }
 
-.monitoreo-grafica__header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 20px;
-  flex-wrap: wrap;
-}
-
-.monitoreo-grafica__titulo-wrap {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.monitoreo-grafica__icono {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-}
-
-.monitoreo-grafica__icono svg {
-  width: 18px;
-  height: 18px;
-}
-
-.monitoreo-grafica__icono--temp {
-  background: #fde8e4;
-  color: #e76f51;
-}
-
-.monitoreo-grafica__icono--hum {
-  background: #e8f1f5;
-  color: #457b9d;
-}
-
 .monitoreo-grafica__titulo {
   font-family: var(--fuente-titulo, 'Cinzel', serif);
   font-size: 16px;
@@ -256,100 +222,6 @@
 .monitoreo-grafica__subtitulo {
   font-size: 12px;
   color: #8c8273;
-}
-
-.monitoreo-grafica__filtros {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.monitoreo-tag-filtro {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
-  border-radius: 6px;
-  background: #faf7f0;
-  border: 1px solid rgba(33, 25, 15, 0.1);
-  font-size: 11.5px;
-  color: #4a4237;
-}
-
-.monitoreo-tag-filtro svg {
-  width: 10px;
-  height: 10px;
-  color: #8c8273;
-}
-
-.monitoreo-limite-badge {
-  padding: 4px 10px;
-  border-radius: 6px;
-  font-size: 11.5px;
-  font-weight: 600;
-}
-
-.monitoreo-limite-badge--temp {
-  background: #fde8e4;
-  color: #d94b2b;
-  border: 1px solid rgba(217, 75, 43, 0.2);
-}
-
-.monitoreo-limite-badge--hum {
-  background: #e8f1f5;
-  color: #2b6c94;
-  border: 1px solid rgba(43, 108, 148, 0.2);
-}
-
-/* Área SVG y Ejes */
-.monitoreo-svg-wrap {
-  display: flex;
-  gap: 10px;
-  height: 200px;
-  position: relative;
-}
-
-.monitoreo-y-eje {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  font-size: 11px;
-  color: #8c8273;
-  width: 24px;
-  text-align: right;
-  padding-bottom: 22px;
-}
-
-.monitoreo-chart-area {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  position: relative;
-}
-
-.grafica-svg {
-  width: 100%;
-  height: 175px;
-}
-
-.monitoreo-x-eje {
-  display: flex;
-  justify-content: space-between;
-  font-size: 11px;
-  color: #8c8273;
-  padding-top: 6px;
-  border-top: 1px solid rgba(33, 25, 15, 0.08);
-}
-
-.monitoreo-eje-label-y {
-  position: absolute;
-  left: 6px;
-  top: 50%;
-  transform: translateY(-50%) rotate(-90deg);
-  font-size: 11px;
-  color: #8c8273;
-  pointer-events: none;
 }
 
 /* ===================== Salas Monitoreo (4 Cards) ===================== */
@@ -1043,43 +915,3 @@ select.monitoreo-select-wrap,
   color: #8c8273;
 }
 
-/* ===================== Gráficas históricas (InfluxDB) ===================== */
-
-.monitoreo-grafica-card--ancho {
-  grid-column: 1 / -1;
-}
-
-.monitoreo-grafica__bloque {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 14px;
-}
-
-.monitoreo-grafica__bloque-titulo {
-  font-size: 13px;
-  font-weight: 600;
-  color: #4a4237;
-}
-
-.monitoreo-grafica__cuerpo {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.monitoreo-grafica__cuerpo .grafica-svg {
-  width: 100%;
-  height: 160px;
-  background: #faf7f0;
-  border-radius: 8px;
-}
-
-.monitoreo-grafica__leyenda {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-  font-size: 12px;
-  color: #736c61;
-}

@@ -1,6 +1,7 @@
 package com.museosmart.controller;
 
 import com.museosmart.dto.AlertaResponse;
+import com.museosmart.dto.AlertaResumenResponse;
 import com.museosmart.service.AlertaService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -40,6 +41,15 @@ public class AlertaController {
     public ResponseEntity<List<AlertaResponse>> listar(@RequestParam(defaultValue = "false") boolean todas) {
         var alertas = todas ? alertaService.listarTodas() : alertaService.listarActivas();
         return ResponseEntity.ok(alertas.stream().map(AlertaResponse::from).toList());
+    }
+
+    @GetMapping("/resumen")
+    @Operation(summary = "Resumen de alertas activas",
+            description = "Devuelve el numero de alertas activas (ABIERTA/RECONOCIDA). "
+                    + "Se lee de Redis; si Redis no responde, se cuenta en PostgreSQL.")
+    @ApiResponse(responseCode = "200", description = "Resumen de alertas")
+    public ResponseEntity<AlertaResumenResponse> resumen() {
+        return ResponseEntity.ok(new AlertaResumenResponse(alertaService.contarAbiertas()));
     }
 
     @PatchMapping("/{id}/resolver")

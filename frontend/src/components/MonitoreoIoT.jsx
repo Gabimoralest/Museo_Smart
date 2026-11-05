@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useState, useMemo, useEffect, useCallback, lazy, Suspense } from 'react'
 import {
   IconoTermometro,
   IconoGota,
@@ -14,13 +14,17 @@ import {
   listarSensores,
   listarLecturasRecientes,
   obtenerResumenMonitoreo,
-  obtenerHistorico,
   obtenerSaludOutbox,
 } from '../data/monitoreoApi'
 import { listarAlertas } from '../data/alertasApi'
 import { ErrorHttp } from '../data/httpClient'
 import Paginacion from './Paginacion'
+import LimiteError from './LimiteError'
 import './MonitoreoIoT.css'
+
+// El histórico se carga de forma diferida: ECharts (y su peso) solo llega a
+// quien entra a Monitoreo IoT, no al resto del panel ni al sitio público.
+const GraficoHistorico = lazy(() => import('./GraficoHistorico'))
 
 // ------------------------------------------------------------------
 // Datos reales: PostgreSQL (sensores, lecturas recientes, resumen) e
@@ -76,40 +80,6 @@ function formatearPromedio(p) {
   return `${v.toFixed(1)}${p.unidad ? ` ${p.unidad}` : ''}`
 }
 
-// Construye el atributo "points" de un <polyline> SVG a partir de una serie de
-// puntos reales (tiempo, valor). Escala a un viewBox 0..100 x 0..100.
-function construirPolyline(puntos) {
-  if (!puntos || puntos.length < 2) return null
-  const tiempos = puntos.map((p) => new Date(p.tiempo).getTime())
-  const valores = puntos.map((p) => Number(p.valor))
-  const tMin = Math.min(...tiempos)
-  const tMax = Math.max(...tiempos)
-  const vMin = Math.min(...valores)
-  const vMax = Math.max(...valores)
-  const rangoT = tMax - tMin || 1
-  const rangoV = vMax - vMin || 1
-  return puntos
-    .map((p) => {
-      const x = ((new Date(p.tiempo).getTime() - tMin) / rangoT) * 100
-      const y = 100 - ((Number(p.valor) - vMin) / rangoV) * 100
-      return `${x.toFixed(2)},${y.toFixed(2)}`
-    })
-    .join(' ')
-}
-
-function resumenSerie(datos) {
-  if (!datos?.series) return null
-  const puntos = datos.series.flatMap((s) => s.puntos)
-  if (puntos.length === 0) return null
-  const valores = puntos.map((p) => Number(p.valor))
-  return {
-    min: Math.min(...valores),
-    max: Math.max(...valores),
-    ultimo: valores[valores.length - 1],
-    total: puntos.length,
-  }
-}
-
 function mensajeDeError(error, porDefecto) {
   if (error instanceof ErrorHttp) {
     if (error.tipo === 'conexion') {
@@ -135,11 +105,6 @@ export default function MonitoreoIoT() {
   const [filtroSala, setFiltroSala] = useState('Todas')
   const [filtroMetrica, setFiltroMetrica] = useState('Todas')
 
-  // Histórico (InfluxDB): rango en horas y estado por métrica.
-  const [rangoHoras, setRangoHoras] = useState(24)
-  const [historico, setHistorico] = useState({}) // { TEMPERATURA: {...}, HUMEDAD: {...} }
-  const [historicoEstado, setHistoricoEstado] = useState({}) // { METRICA: 'cargando'|'error'|'ok' }
-
   // Salud del outbox (envío de lecturas a InfluxDB).
   const [outbox, setOutbox] = useState(null)
   const [outboxEstado, setOutboxEstado] = useState('cargando') // cargando|ok|error
@@ -152,39 +117,65 @@ export default function MonitoreoIoT() {
   const [paginaActual, setPaginaActual] = useState(1)
   const elementosPorPagina = 6
 
+  // Ninguna carga debe quedar indefinida: a los 15 s se muestra el error con
+  // su botón Reintentar aunque alguna consulta siga pendiente.
+  const TIEMPO_MAXIMO_CARGA_MS = 15_000
+
   const cargar = useCallback(async (signal) => {
     setCargando(true)
     setErrorCarga(null)
-    const resultados = await Promise.allSettled([
-      listarSensores({ signal }).then((d) => setSensores(d || [])),
-      listarLecturasRecientes({ signal }).then((d) => setLecturas(d || [])),
-      obtenerResumenMonitoreo({ signal }).then((d) => setResumen(d || null)),
-      obtenerSaludOutbox({ signal })
-        .then((d) => {
-          setOutbox(d || null)
-          setOutboxEstado('ok')
-        })
-        .catch((e) => {
-          if (e?.name !== 'AbortError') setOutboxEstado('error')
-        }),
-      listarAlertas({ todas: false, signal })
-        .then((d) => {
-          setAlertas(d || [])
-          setAlertasEstado('ok')
-        })
-        .catch((e) => {
-          if (e?.name !== 'AbortError') setAlertasEstado('error')
-        }),
-    ])
-    const fallos = resultados.filter(
-      (r) => r.status === 'rejected' && r.reason?.name !== 'AbortError',
-    )
-    if (fallos.length > 0) {
-      setErrorCarga(
-        mensajeDeError(fallos[0].reason, 'No se pudo cargar la información de monitoreo.'),
+    setOutboxEstado('cargando')
+    setAlertasEstado('cargando')
+    let finalizado = false
+    const limite = setTimeout(() => {
+      if (finalizado) return
+      finalizado = true
+      setErrorCarga('La carga está tardando más de lo esperado. Revisa la conexión e inténtalo de nuevo.')
+      setOutboxEstado('error')
+      setAlertasEstado('error')
+      setCargando(false)
+    }, TIEMPO_MAXIMO_CARGA_MS)
+    try {
+      const resultados = await Promise.allSettled([
+        listarSensores({ signal }).then((d) => setSensores(d || [])),
+        listarLecturasRecientes({ signal }).then((d) => setLecturas(d || [])),
+        obtenerResumenMonitoreo({ signal }).then((d) => setResumen(d || null)),
+        obtenerSaludOutbox({ signal })
+          .then((d) => {
+            setOutbox(d || null)
+            setOutboxEstado('ok')
+          })
+          .catch((e) => {
+            if (e?.name !== 'AbortError') setOutboxEstado('error')
+          }),
+        listarAlertas({ todas: false, signal })
+          .then((d) => {
+            setAlertas(d || [])
+            setAlertasEstado('ok')
+          })
+          .catch((e) => {
+            if (e?.name !== 'AbortError') setAlertasEstado('error')
+          }),
+      ])
+      const fallos = resultados.filter(
+        (r) => r.status === 'rejected' && r.reason?.name !== 'AbortError',
       )
+      if (fallos.length > 0 && !finalizado) {
+        setErrorCarga(
+          mensajeDeError(fallos[0].reason, 'No se pudo cargar la información de monitoreo.'),
+        )
+      }
+    } catch (error) {
+      if (error?.name !== 'AbortError') {
+        setErrorCarga(mensajeDeError(error, 'No se pudo cargar la información de monitoreo.'))
+      }
+    } finally {
+      clearTimeout(limite)
+      if (!finalizado) {
+        finalizado = true
+        setCargando(false)
+      }
     }
-    setCargando(false)
   }, [])
 
   useEffect(() => {
@@ -193,51 +184,6 @@ export default function MonitoreoIoT() {
     return () => controlador.abort()
   }, [cargar])
 
-  // Carga del histórico de temperatura y humedad para el rango seleccionado.
-  const cargarHistorico = useCallback(async (signal) => {
-    const hasta = new Date()
-    const desde = new Date(hasta.getTime() - rangoHoras * 60 * 60 * 1000)
-    const metricas = ['TEMPERATURA', 'HUMEDAD']
-    setHistoricoEstado((prev) => {
-      const copia = { ...prev }
-      metricas.forEach((m) => (copia[m] = 'cargando'))
-      return copia
-    })
-    const resultados = await Promise.allSettled(
-      metricas.map((metrica) =>
-        obtenerHistorico({
-          metrica,
-          desde: desde.toISOString(),
-          hasta: hasta.toISOString(),
-          signal,
-        }).then((d) => ({ metrica, datos: d })),
-      ),
-    )
-    setHistorico((prev) => {
-      const copia = { ...prev }
-      resultados.forEach((r) => {
-        if (r.status === 'fulfilled') copia[r.value.metrica] = r.value.datos
-      })
-      return copia
-    })
-    setHistoricoEstado((prev) => {
-      const copia = { ...prev }
-      resultados.forEach((r, i) => {
-        const metrica = metricas[i]
-        if (r.status === 'fulfilled') copia[metrica] = 'ok'
-        else if (r.reason?.name !== 'AbortError') copia[metrica] = 'error'
-      })
-      return copia
-    })
-  }, [rangoHoras])
-
-  useEffect(() => {
-    const controlador = new AbortController()
-    cargarHistorico(controlador.signal)
-    return () => controlador.abort()
-  }, [cargarHistorico])
-
-  // Índice de sensores por id (para enriquecer las lecturas).
   const sensorPorId = useMemo(() => {
     const mapa = new Map()
     sensores.forEach((s) => mapa.set(s.id, s))
@@ -521,107 +467,21 @@ export default function MonitoreoIoT() {
         )}
       </section>
 
-      {/* ===================== Gráficas históricas (InfluxDB) ===================== */}
+      {/* ===================== Gráficas históricas (InfluxDB, ECharts) ===================== */}
       <section className="monitoreo-graficas-grid">
-        <article className="monitoreo-grafica-card monitoreo-grafica-card--ancho">
-          <header className="monitoreo-grafica__header">
-            <div className="monitoreo-grafica__titulo-wrap">
-              <span className="monitoreo-grafica__icono monitoreo-grafica__icono--temp">
-                <IconoAnalitica />
-              </span>
-              <div>
-                <h2 className="monitoreo-grafica__titulo">Histórico de temperatura y humedad</h2>
-                <span className="monitoreo-grafica__subtitulo">
-                  InfluxDB · últimos {rangoHoras} h
-                </span>
-              </div>
-            </div>
-            <select
-              className="monitoreo-select-wrap"
-              value={rangoHoras}
-              onChange={(e) => setRangoHoras(Number(e.target.value))}
-              aria-label="Rango temporal del histórico"
-            >
-              <option value={1}>Última 1 h</option>
-              <option value={6}>Últimas 6 h</option>
-              <option value={24}>Últimas 24 h</option>
-              <option value={168}>Últimos 7 días</option>
-            </select>
-          </header>
-
-          {['TEMPERATURA', 'HUMEDAD'].map((metrica) => {
-            const datos = historico[metrica]
-            const estado = historicoEstado[metrica]
-            const resumenSerieDato = resumenSerie(datos)
-            return (
-              <div key={metrica} className="monitoreo-grafica__bloque">
-                <span className="monitoreo-grafica__bloque-titulo">
-                  {metrica === 'TEMPERATURA' ? 'Temperatura (°C)' : 'Humedad (%)'}
-                </span>
-                {estado === 'cargando' && (
-                  <div className="monitoreo-vacio" role="status">
-                    <span>Cargando histórico…</span>
-                  </div>
-                )}
-                {estado === 'error' && (
-                  <div className="monitoreo-vacio" role="alert">
-                    <IconoAdvertencia />
-                    <span>No se pudo cargar el histórico.</span>
-                    <button
-                      type="button"
-                      className="monitoreo-aviso__boton"
-                      onClick={() => cargarHistorico()}
-                    >
-                      Reintentar
-                    </button>
-                  </div>
-                )}
-                {estado === 'ok' && !resumenSerieDato && (
-                  <div className="monitoreo-vacio" role="status">
-                    <IconoBuscar />
-                    <span>Sin datos en el rango seleccionado.</span>
-                  </div>
-                )}
-                {estado === 'ok' && resumenSerieDato && (
-                  <div className="monitoreo-grafica__cuerpo">
-                    <svg
-                      viewBox="0 0 100 100"
-                      preserveAspectRatio="none"
-                      className="grafica-svg"
-                      role="img"
-                      aria-label={`Histórico de ${metrica}`}
-                    >
-                      {datos.series.map((serie) => {
-                        const poly = construirPolyline(serie.puntos)
-                        if (!poly) return null
-                        return (
-                          <polyline
-                            key={serie.sensor}
-                            points={poly}
-                            fill="none"
-                            stroke={metrica === 'TEMPERATURA' ? '#e76f51' : '#457b9d'}
-                            strokeWidth="1.2"
-                            vectorEffect="non-scaling-stroke"
-                          />
-                        )
-                      })}
-                    </svg>
-                    <div className="monitoreo-grafica__leyenda">
-                      <span>
-                        Mín {resumenSerieDato.min.toFixed(1)} · Máx{' '}
-                        {resumenSerieDato.max.toFixed(1)} · Último{' '}
-                        {resumenSerieDato.ultimo.toFixed(1)}
-                      </span>
-                      <span>
-                        {datos.series.length} serie(s) · {resumenSerieDato.total} puntos
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </article>
+        <LimiteError mensaje="No se pudo mostrar el histórico ambiental. Las tarjetas y el resto de la página siguen disponibles.">
+          <Suspense
+            fallback={
+              <article className="monitoreo-grafica-card monitoreo-grafica-card--ancho">
+                <div className="monitoreo-vacio" role="status">
+                  <span>Cargando histórico…</span>
+                </div>
+              </article>
+            }
+          >
+            <GraficoHistorico />
+          </Suspense>
+        </LimiteError>
       </section>
 
       {/* ===================== Alertas ambientales activas (IoT) ===================== */}

@@ -6,6 +6,7 @@ import com.museosmart.entity.Sala;
 import com.museosmart.entity.Sensor;
 import com.museosmart.repository.AlertaRepository;
 import com.museosmart.repository.ExhibicionRepository;
+import com.museosmart.repository.redis.AlertaRedisRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -40,11 +41,14 @@ class AlertaServiceTest {
     @Mock
     private ExhibicionRepository exhibicionRepository;
 
+    @Mock
+    private AlertaRedisRepository alertaRedis;
+
     private AlertaService alertaService;
 
     @BeforeEach
     void setUp() {
-        alertaService = new AlertaService(alertaRepository, exhibicionRepository);
+        alertaService = new AlertaService(alertaRepository, exhibicionRepository, alertaRedis);
     }
 
     private Sensor sensorAmbiental(Long salaId) {

@@ -1,0 +1,384 @@
+/* ============================================================
+   Histórico ambiental (Apache ECharts) — Monitoreo IoT
+   ------------------------------------------------------------
+   Vista "Por sala": cuadrícula 3/2/1 columnas con ejes de tiempo
+   sincronizados. Vista "Comparar": una sola gráfica con leyenda-tarjetas.
+   ============================================================ */
+
+.grafico-hist {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  padding: clamp(16px, 2vw, 22px) clamp(16px, 2.2vw, 24px) 18px;
+  background: #ffffff;
+  border: 1px solid rgba(33, 25, 15, 0.08);
+  border-radius: 14px;
+  box-shadow: 0 4px 20px -8px rgba(33, 25, 15, 0.05);
+}
+
+/* ---------- Cabecera ---------- */
+
+.grafico-hist__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.grafico-hist__titulo-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.grafico-hist__acciones {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.grafico-hist__vistas,
+.grafico-hist__rango {
+  display: inline-flex;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 10px;
+  background: rgba(33, 25, 15, 0.05);
+  flex-wrap: wrap;
+}
+
+.grafico-hist__vista-btn,
+.grafico-hist__rango-btn {
+  border: none;
+  background: transparent;
+  color: #736c61;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.grafico-hist__vista-btn:hover,
+.grafico-hist__rango-btn:hover {
+  background: rgba(169, 116, 28, 0.12);
+  color: #6f4c15;
+}
+
+.grafico-hist__vista-btn.is-activo {
+  background: #3c352c;
+  color: #fff;
+}
+
+.grafico-hist__rango-btn.is-activo {
+  background: #a9741c;
+  color: #fff;
+}
+
+/* ---------- Pestañas de métrica ---------- */
+
+.grafico-hist__tabs {
+  display: flex;
+  gap: 6px;
+  border-bottom: 1px solid rgba(33, 25, 15, 0.08);
+  flex-wrap: wrap;
+}
+
+.grafico-hist__tab {
+  border: none;
+  background: transparent;
+  color: #736c61;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.grafico-hist__tab:hover {
+  color: #6f4c15;
+}
+
+.grafico-hist__tab.is-activo {
+  color: #8a5d12;
+  border-bottom-color: #a9741c;
+}
+
+.grafico-hist__tab-unidad {
+  font-weight: 500;
+  color: #a09584;
+}
+
+/* ---------- Vista por sala ---------- */
+
+.grafico-hist__salas {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  min-width: 0;
+}
+
+.grafico-hist__sala-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 12px 8px;
+  background: #fffdf8;
+  border: 1px solid rgba(33, 25, 15, 0.08);
+  border-radius: 12px;
+  min-width: 0;
+  box-shadow: 0 2px 10px -6px rgba(33, 25, 15, 0.12);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.grafico-hist__sala-card:hover {
+  border-color: rgba(169, 116, 28, 0.4);
+  box-shadow: 0 6px 18px -8px rgba(33, 25, 15, 0.18);
+}
+
+.grafico-hist__sala-card.is-fuera {
+  border-color: rgba(192, 57, 43, 0.65);
+  box-shadow: 0 0 0 1px rgba(192, 57, 43, 0.18), 0 6px 18px -8px rgba(192, 57, 43, 0.25);
+}
+
+.grafico-hist__sala-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.grafico-hist__sala-nombre {
+  font-family: var(--fuente-titulo, 'Cinzel', serif);
+  font-size: 13px;
+  font-weight: 700;
+  color: #1a1714;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.grafico-hist__sala-dato {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.grafico-hist__sala-valor {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #1a1714;
+  line-height: 1.1;
+}
+
+.grafico-hist__sala-estado {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.grafico-hist__sala-estado.is-ok {
+  color: #1f6b4a;
+  background: rgba(42, 157, 143, 0.12);
+}
+
+.grafico-hist__sala-estado.is-fuera {
+  color: #a33327;
+  background: rgba(192, 57, 43, 0.12);
+}
+
+.grafico-hist__sala-estado.is-vacio {
+  color: #736c61;
+  background: rgba(33, 25, 15, 0.07);
+}
+
+.grafico-hist__sala-veces {
+  font-size: 11px;
+  font-weight: 600;
+  color: #a33327;
+}
+
+.grafico-hist__sala-canvas {
+  width: 100%;
+  min-width: 0;
+  margin-top: 2px;
+}
+
+/* ---------- Vista comparar: resumen / leyenda ---------- */
+
+.grafico-hist__resumen {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px;
+}
+
+.grafico-hist__resumen-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #faf7f0;
+  border: 1px solid rgba(33, 25, 15, 0.06);
+  min-width: 0;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  transition: opacity 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.grafico-hist__resumen-item:hover {
+  border-color: rgba(169, 116, 28, 0.45);
+}
+
+.grafico-hist__resumen-item.is-fuera {
+  border-color: rgba(192, 57, 43, 0.45);
+  background: #fbf1ef;
+}
+
+.grafico-hist__resumen-item.is-oculta {
+  opacity: 0.42;
+}
+
+.grafico-hist__resumen-nombre {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #3c352c;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.grafico-hist__resumen-datos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 11px;
+  color: #736c61;
+}
+
+.grafico-hist__resumen-datos strong {
+  color: #2b241c;
+  font-weight: 600;
+}
+
+.grafico-hist__fuera {
+  color: #a33327;
+  font-weight: 700;
+}
+
+.grafico-hist__veces {
+  color: #a33327;
+  font-weight: 600;
+}
+
+.grafico-hist__punto {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+.grafico-hist__leyenda-botones {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.grafico-hist__leyenda-botones button {
+  border: 1px solid rgba(169, 116, 28, 0.4);
+  background: transparent;
+  color: #8a5d12;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.grafico-hist__leyenda-botones button:hover {
+  background: rgba(169, 116, 28, 0.1);
+}
+
+.grafico-hist__canvas {
+  width: 100%;
+  min-width: 0;
+}
+
+/* ---------- Estados ---------- */
+
+.grafico-hist__esqueleto {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.grafico-hist__esqueleto-area {
+  height: 260px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #f1ece2 25%, #f7f3eb 50%, #f1ece2 75%);
+  background-size: 200% 100%;
+  animation: grafico-hist-shimmer 1.2s infinite linear;
+}
+
+@keyframes grafico-hist-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* ---------- Responsive ---------- */
+
+@media (max-width: 1024px) {
+  .grafico-hist__salas {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .grafico-hist__salas {
+    grid-template-columns: 1fr;
+  }
+
+  .grafico-hist__header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .grafico-hist__acciones {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .grafico-hist__vistas,
+  .grafico-hist__rango {
+    justify-content: center;
+  }
+
+  .grafico-hist__resumen {
+    grid-template-columns: 1fr;
+  }
+
+  .grafico-hist__sala-valor {
+    font-size: 22px;
+  }
+}

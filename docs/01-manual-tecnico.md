@@ -617,6 +617,41 @@ Componentes públicos: `Navbar`, `Hero`, `Salas`, `TarjetaSala`, `ModalSala`,
 
 ## 5. Base de datos y persistencia
 
+### 5.0 Arquitectura de datos
+
+Museo_Smart usa tres almacenes con responsabilidades separadas. La regla es:
+**PostgreSQL es la fuente de verdad; Redis es el estado actual; InfluxDB es el
+historial.**
+
+| Almacen | Rol | Que guarda | Fuente de verdad |
+|---|---|---|---|
+| **PostgreSQL** | Datos estructurados y permanentes | Salas, exhibiciones, sensores, usuarios, visitas, alertas, mensajes IoT, outbox `medicion_pendiente` | **Si** |
+| **Redis** | Estado actual (consultas rapidas) | Ultima lectura de cada sensor, resumen por sala, presencia por exhibicion, ids de alertas activas | No (volatil, TTL 5 min) |
+| **InfluxDB** | Historico de mediciones | Series temporales por metrica y sensor | No (historico) |
+
+**Flujo de una lectura MQTT**
+
+```
+Node-RED -> Mosquitto -> MqttConsumidor -> MensajeIotService
+   -> PostgreSQL: mensaje_iot, medicion_pendiente (outbox), visitas, presencia_actual
+   -> Redis (tras commit): museo:sensor:<codigo>, museo:sala:<id>, museo:exhibicion:<id>:presencia
+OutboxDrenador -> InfluxDB (historico) y actualiza <metrica>.estado en Redis
+```
+
+**Lectura del panel**
+
+- `GET /api/v1/admin/monitoreo/lecturas-recientes`, `.../sensores` y
+  `.../resumen`: primero Redis; si no hay dato vigente, PostgreSQL. El formato de
+  respuesta no cambia.
+- `GET /api/v1/admin/alertas/resumen`: Redis (conteo de alertas activas); si
+  Redis falla, PostgreSQL.
+
+**Regla de coherencia**
+
+Redis nunca sustituye una escritura en PostgreSQL: se escribe **despues** del
+commit y con TTL. Si Redis cae, no se pierde ningun dato permanente y la
+aplicacion sigue operando con PostgreSQL (ver 5.2).
+
 ### 5.1 PostgreSQL (fuente de verdad)
 
 Base `Museo_Smart`, esquema `public`, codificación UTF8. Tablas y vista descritas
@@ -638,11 +673,65 @@ en 3.5. Puntos clave:
 Datos iniciales: 4 salas, 8 exhibiciones `[PROVISIONAL]`, 12 sensores; los
 límites ambientales de V9. **No hay usuario inicial en migraciones.**
 
-### 5.2 Redis
+### 5.2 Redis (estado actual)
 
-Definido en `docker-compose.yml` con AOF y contraseña, pero **ningún componente
-del código lo usa**. `PopularidadService` documenta explícitamente que no depende
-de Redis.
+Redis es una capa de **ESTADO ACTUAL** (datos volatiles), **no una fuente de
+verdad**. PostgreSQL conserva los datos permanentes y el historico; InfluxDB el
+historico de mediciones. Redis acelera las consultas del "ahora" y evita golpear
+PostgreSQL en cada refresco del panel.
+
+**Implementacion**
+
+- Paquete `repository.redis` (Controllers -> Services -> Repositories -> Redis):
+  - `RedisSoporte`: acceso tolerante; cualquier fallo se absorbe (aviso en log
+    como maximo una vez por minuto) y la operacion devuelve vacio.
+  - `EstadoSensorRedisRepository`: estado actual de sensores y salas.
+  - `AlertaRedisRepository`: conjunto de alertas activas.
+  - `RedisClaves`: nombres de clave centralizados.
+- `MensajeIotService` escribe el estado actual tras confirmar la transaccion
+  (nunca refleja una lectura que PostgreSQL revirtio).
+- `MedicionEnvioService` mantiene el estado del outbox (PENDIENTE/ENVIADO/ERROR)
+  en el hash de Redis para que el panel muestre lo mismo que PostgreSQL.
+- `MonitoreoService` (lecturas recientes, sensores y presencia del resumen) lee
+  **primero de Redis** y cae a PostgreSQL si no hay datos.
+- `AlertaService` mantiene el conjunto de alertas activas; el nuevo
+  `GET /api/v1/admin/alertas/resumen` devuelve `{ "abiertas": n }` leido de
+  Redis (o contado en PostgreSQL si Redis falla). La campana del panel lo
+  consulta cada 30 s.
+
+**Claves de Redis**
+
+| Clave | Tipo | Contenido | TTL |
+|---|---|---|---|
+| `museo:sensor:<codigo>` | hash | `sensorId`, `sensorCodigo`, `categoria`, `salaId`, `exhibicionId`, `actualizadoEn`; por metrica `t/h/l/p` -> `.valor`, `.unidad`, `.medidoEn`, `.estado` | 300 s (5 min) |
+| `museo:sala:<salaId>` | hash | `sensorCodigo`, `temperatura`, `humedad`, `luminosidad`, `actualizadoEn` | 300 s |
+| `museo:exhibicion:<id>:presencia` | hash | `exhibicionId`, `sensorCodigo`, `presencia` (1/0), `actualizadoEn` | 300 s |
+| `museo:sensores:indice` | set | codigos de sensores con estado vigente | 900 s |
+| `museo:alertas:abiertas` | set | ids de alertas ABIERTA/RECONOCIDA | sin TTL (se mantiene al crear/resolver) |
+
+El TTL de 5 minutos es intencional: si un sensor deja de enviar, su estado
+expira y el panel lo muestra como "sin datos recientes" (no se inventan valores).
+
+**Configuracion**
+
+- `REDIS_HOST`, `REDIS_PORT` (desarrollo: `localhost`, `6380`),
+  `REDIS_PASSWORD`, `REDIS_ENABLED`, `REDIS_TTL_ESTADO_SENSOR_SEGUNDOS`.
+- En Docker: `mem_limit: 64m`, `maxmemory 48mb`, politica `allkeys-lru`,
+  persistencia desactivada (es una cache).
+- Timeouts cortos (800 ms) y reconexion automatica de Lettuce.
+
+**Que pasa si Redis cae**
+
+- La aplicacion **arranca igual** y registra un aviso: "Redis no disponible...
+  se usara PostgreSQL como respaldo".
+- Monitoreo, sitio y panel siguen funcionando con PostgreSQL; la ingesta MQTT y
+  el outbox no se ven afectados porque las escrituras a Redis son posteriores al
+  commit y tolerantes a fallos.
+- El health check de Redis esta desactivado para que su caida no marque la
+  aplicacion como DOWN.
+- La campana usa el conteo de PostgreSQL mientras Redis no vuelva. Al recuperar
+  Redis, el estado actual se repuebla con los siguientes mensajes y el conjunto
+  de alertas se resincroniza al arrancar.
 
 ### 5.3 InfluxDB 2.x
 

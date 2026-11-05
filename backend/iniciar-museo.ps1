@@ -376,6 +376,33 @@ $env:INFLUX_BUCKET = if ($influxBucket.Value) { $influxBucket.Value } else { 'mu
 $env:INFLUX_URL = 'http://localhost:8087'
 Write-Ok "INFLUX_URL=http://localhost:8087 (org/bucket definidos)."
 
+# ---------------- 6c. Redis (estado actual de sensores y alertas) ----------------
+
+Write-Step "Configurando Redis (fuente: entorno o docker\.env)"
+
+# Redis es una capa VOLATIL de estado actual: si no esta disponible, el backend
+# sigue funcionando con PostgreSQL. Por eso aqui solo se informa; no se aborta.
+$redisHost = Resolve-IotVar -Name 'REDIS_HOST' -DockerEnv $dockerEnv
+$env:REDIS_HOST = if ($redisHost.Value) { $redisHost.Value } else { 'localhost' }
+
+$redisPort = Resolve-IotVar -Name 'REDIS_PORT' -DockerEnv $dockerEnv
+$env:REDIS_PORT = if ($redisPort.Value) { $redisPort.Value } else { '6380' }
+
+$redisPass = Resolve-IotVar -Name 'REDIS_PASSWORD' -DockerEnv $dockerEnv
+if ($redisPass.Value) {
+    $env:REDIS_PASSWORD = $redisPass.Value
+    if ($redisPass.Value -match 'cambia') {
+        Write-Warn2 "REDIS_PASSWORD sigue con el placeholder de ejemplo; Redis rechazara la conexion (se usara PostgreSQL)."
+    } else {
+        Write-Ok "REDIS_PASSWORD cargada desde $($redisPass.Origin), longitud=$($redisPass.Value.Length)."
+    }
+} else {
+    Write-Warn2 "REDIS_PASSWORD no encontrada; si Redis exige clave, se usara PostgreSQL como respaldo."
+}
+
+if (-not $env:REDIS_ENABLED) { $env:REDIS_ENABLED = 'true' }
+Write-Ok "Redis configurado en ${env:REDIS_HOST}:${env:REDIS_PORT} (habilitado=$($env:REDIS_ENABLED))."
+
 # ---------------- 7. Validaciones previas ----------------
 
 Write-Step "Validaciones previas"
@@ -456,6 +483,10 @@ Write-Host ("  INFLUX_URL         : " + $env:INFLUX_URL)
 Write-Host ("  INFLUX_ORG/BUCKET  : " + $env:INFLUX_ORG + " / " + $env:INFLUX_BUCKET)
 $influxTokenResumen = if ($env:INFLUX_TOKEN) { "definido (len=" + $env:INFLUX_TOKEN.Length + ")" } else { "no definido" }
 Write-Host ("  INFLUX_TOKEN       : " + $influxTokenResumen)
+
+Write-Host ("  REDIS_HOST:PORT    : " + $env:REDIS_HOST + ":" + $env:REDIS_PORT)
+$redisPassResumen = if ($env:REDIS_PASSWORD) { "definida (len=" + $env:REDIS_PASSWORD.Length + ")" } else { "no definida" }
+Write-Host ("  REDIS_PASSWORD     : " + $redisPassResumen)
 Write-Host "=========================================================" -ForegroundColor White
 Write-Host ""
 

@@ -13,6 +13,7 @@ import com.museosmart.iot.dto.MensajePresenciaDto;
 import com.museosmart.repository.MedicionPendienteRepository;
 import com.museosmart.repository.MensajeIotRepository;
 import com.museosmart.repository.SensorRepository;
+import com.museosmart.repository.redis.EstadoSensorRedisRepository;
 import com.museosmart.service.AlertaService;
 import com.museosmart.service.PopularidadService;
 import org.slf4j.Logger;
@@ -20,6 +21,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -56,6 +59,7 @@ public class MensajeIotService {
     private final MensajeIotValidador validador;
     private final AlertaService alertaService;
     private final PopularidadService popularidadService;
+    private final EstadoSensorRedisRepository estadoSensorRedis;
     private final ObjectMapper objectMapper;
 
     public MensajeIotService(MensajeIotRepository mensajeIotRepository,
@@ -64,6 +68,7 @@ public class MensajeIotService {
                              MensajeIotValidador validador,
                              AlertaService alertaService,
                              PopularidadService popularidadService,
+                             EstadoSensorRedisRepository estadoSensorRedis,
                              ObjectMapper objectMapper) {
         this.mensajeIotRepository = mensajeIotRepository;
         this.medicionPendienteRepository = medicionPendienteRepository;
@@ -71,6 +76,7 @@ public class MensajeIotService {
         this.validador = validador;
         this.alertaService = alertaService;
         this.popularidadService = popularidadService;
+        this.estadoSensorRedis = estadoSensorRedis;
         this.objectMapper = objectMapper;
     }
 
@@ -150,6 +156,12 @@ public class MensajeIotService {
         guardarMedicion(mensaje, sensor, "HUMEDAD", dto.humedad(), "%", dto.timestamp());
         guardarMedicion(mensaje, sensor, "LUZ", dto.luminosidad(), "lux", dto.timestamp());
 
+        // Estado actual en Redis (TTL 5 min) DESPUES de confirmar la transaccion:
+        // PostgreSQL/outbox siguen siendo la fuente de verdad y no se altera
+        // ninguna escritura existente. Redis es solo aceleracion del "ahora".
+        guardarEstadoAmbientalEnRedis(sensor, dto.temperatura(), dto.humedad(),
+                dto.luminosidad(), dto.timestamp());
+
         alertaService.evaluarAmbiental(sensor, "TEMPERATURA", dto.temperatura());
         alertaService.evaluarAmbiental(sensor, "HUMEDAD", dto.humedad());
         alertaService.evaluarAmbiental(sensor, "LUZ", dto.luminosidad());
@@ -180,10 +192,13 @@ public class MensajeIotService {
         BigDecimal valor = dto.presencia() ? BigDecimal.ONE : BigDecimal.ZERO;
         guardarMedicion(mensaje, sensor, "PRESENCIA", valor.doubleValue(), null, dto.timestamp());
 
+        // Estado actual de presencia en Redis (TTL 5 min), tras confirmar.
+        boolean hayPresencia = Boolean.TRUE.equals(dto.presencia());
+        guardarPresenciaEnRedis(sensor, hayPresencia, dto.timestamp());
+
         // Flanco de subida: solo cuando la presencia pasa a activa desde un
         // estado distinto (false o desconocido) se contabiliza una visita. Las
         // lecturas periodicas con presencia ya activa no vuelven a contar.
-        boolean hayPresencia = Boolean.TRUE.equals(dto.presencia());
         boolean flancoSubida = hayPresencia && !Boolean.TRUE.equals(sensor.getPresenciaActual());
 
         // Se comprueba la actividad de la exhibicion ANTES de delegar en
@@ -218,6 +233,40 @@ public class MensajeIotService {
         medicion.setUnidad(unidad);
         medicion.setMedidoEn(medidoEn);
         medicionPendienteRepository.save(medicion);
+    }
+
+    /**
+     * Guarda el estado actual ambiental en Redis tras el commit. Si Redis falla,
+     * el repositorio lo absorbe (aviso en log) y la transaccion no se ve afectada.
+     */
+    private void guardarEstadoAmbientalEnRedis(Sensor sensor, double temperatura,
+                                               double humedad, double luminosidad,
+                                               OffsetDateTime medidoEn) {
+        ejecutarTrasCommit(() -> estadoSensorRedis.guardarAmbiental(
+                sensor, temperatura, humedad, luminosidad, medidoEn, "PENDIENTE"));
+    }
+
+    private void guardarPresenciaEnRedis(Sensor sensor, boolean presencia, OffsetDateTime medidoEn) {
+        ejecutarTrasCommit(() -> estadoSensorRedis.guardarPresencia(
+                sensor, presencia, medidoEn, "PENDIENTE"));
+    }
+
+    /**
+     * Ejecuta una escritura en Redis solo cuando la transaccion confirma. Asi el
+     * estado actual nunca refleja una lectura que PostgreSQL revirtio. Fuera de
+     * una transaccion activa se ejecuta de inmediato.
+     */
+    private void ejecutarTrasCommit(Runnable accion) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    accion.run();
+                }
+            });
+        } else {
+            accion.run();
+        }
     }
 
     private <T> T leer(String payload, Class<T> tipo) {

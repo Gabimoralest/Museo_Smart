@@ -70,11 +70,17 @@ public class InfluxLector {
                 Object sensor = fila.getValueByKey("sensor");
                 String clave = sensor != null ? sensor.toString() : "(sin sensor)";
                 series.computeIfAbsent(clave, k -> new ArrayList<>())
-                        .add(new Punto(tiempo, numero.doubleValue()));
+                        .add(new Punto(tiempo, numero.doubleValue(),
+                                aDouble(fila.getValueByKey("min")),
+                                aDouble(fila.getValueByKey("max"))));
             }
         }
         series.values().forEach(lista -> lista.sort((a, b) -> a.tiempo().compareTo(b.tiempo())));
         return series;
+    }
+
+    private static Double aDouble(Object valor) {
+        return valor instanceof Number numero ? numero.doubleValue() : null;
     }
 
     private InfluxDBClient cliente() {
@@ -108,7 +114,17 @@ public class InfluxLector {
         }
     }
 
-    /** Punto de una serie temporal. */
-    public record Punto(Instant tiempo, double valor) {
+    /**
+     * Punto de una serie temporal.
+     *
+     * @param tiempo instante del punto (inicio de la ventana agregada).
+     * @param valor  promedio (o valor unico) de la ventana.
+     * @param minimo minimo de la ventana, si la consulta lo devuelve.
+     * @param maximo maximo de la ventana, si la consulta lo devuelve.
+     */
+    public record Punto(Instant tiempo, double valor, Double minimo, Double maximo) {
+        public Punto(Instant tiempo, double valor) {
+            this(tiempo, valor, null, null);
+        }
     }
 }

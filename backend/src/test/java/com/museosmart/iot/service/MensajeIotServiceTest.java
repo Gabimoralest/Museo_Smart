@@ -11,6 +11,7 @@ import com.museosmart.iot.MensajeIotValidador;
 import com.museosmart.repository.MedicionPendienteRepository;
 import com.museosmart.repository.MensajeIotRepository;
 import com.museosmart.repository.SensorRepository;
+import com.museosmart.repository.redis.EstadoSensorRedisRepository;
 import com.museosmart.service.AlertaService;
 import com.museosmart.service.PopularidadService;
 import org.junit.jupiter.api.BeforeEach;
@@ -71,6 +72,9 @@ class MensajeIotServiceTest {
     @Mock
     private PopularidadService popularidadService;
 
+    @Mock
+    private EstadoSensorRedisRepository estadoSensorRedis;
+
     private MensajeIotService service;
 
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
@@ -78,7 +82,7 @@ class MensajeIotServiceTest {
     @BeforeEach
     void setUp() {
         service = new MensajeIotService(mensajeIotRepository, medicionPendienteRepository,
-                sensorRepository, validador, alertaService, popularidadService, objectMapper);
+                sensorRepository, validador, alertaService, popularidadService, estadoSensorRedis, objectMapper);
     }
 
     private Exhibicion exhibicion(Long id, boolean activa) {

@@ -15,16 +15,33 @@
 // ============================================================
 import { solicitarAdmin } from './adminApi'
 
+// Ninguna consulta de monitoreo debe quedar colgada: si PostgreSQL, Redis o
+// InfluxDB no responden, la petición se aborta y la vista muestra el error con
+// su botón Reintentar (en lugar de un "cargando" infinito).
+const TIEMPO_LIMITE_MS = 15_000
+
 export function listarSensores({ signal } = {}) {
-  return solicitarAdmin('/admin/monitoreo/sensores', { method: 'GET', signal })
+  return solicitarAdmin('/admin/monitoreo/sensores', {
+    method: 'GET',
+    signal,
+    tiempoLimiteMs: TIEMPO_LIMITE_MS,
+  })
 }
 
 export function listarLecturasRecientes({ signal } = {}) {
-  return solicitarAdmin('/admin/monitoreo/lecturas-recientes', { method: 'GET', signal })
+  return solicitarAdmin('/admin/monitoreo/lecturas-recientes', {
+    method: 'GET',
+    signal,
+    tiempoLimiteMs: TIEMPO_LIMITE_MS,
+  })
 }
 
 export function obtenerResumenMonitoreo({ signal } = {}) {
-  return solicitarAdmin('/admin/monitoreo/resumen', { method: 'GET', signal })
+  return solicitarAdmin('/admin/monitoreo/resumen', {
+    method: 'GET',
+    signal,
+    tiempoLimiteMs: TIEMPO_LIMITE_MS,
+  })
 }
 
 /**
@@ -36,7 +53,11 @@ export function obtenerResumenMonitoreo({ signal } = {}) {
 export function obtenerHistorico({ metrica, desde, hasta, sensor, signal } = {}) {
   const params = new URLSearchParams({ metrica, desde, hasta })
   if (sensor) params.set('sensor', sensor)
-  return solicitarAdmin(`/admin/monitoreo/historico?${params.toString()}`, { method: 'GET', signal })
+  return solicitarAdmin(`/admin/monitoreo/historico?${params.toString()}`, {
+    method: 'GET',
+    signal,
+    tiempoLimiteMs: TIEMPO_LIMITE_MS,
+  })
 }
 
 /**
@@ -45,5 +66,9 @@ export function obtenerHistorico({ metrica, desde, hasta, sensor, signal } = {})
  * @returns {Promise<object>} SaludOutboxResponse
  */
 export function obtenerSaludOutbox({ signal } = {}) {
-  return solicitarAdmin('/admin/monitoreo/salud-outbox', { method: 'GET', signal })
+  return solicitarAdmin('/admin/monitoreo/salud-outbox', {
+    method: 'GET',
+    signal,
+    tiempoLimiteMs: TIEMPO_LIMITE_MS,
+  })
 }

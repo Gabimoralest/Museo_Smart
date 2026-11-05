@@ -3,6 +3,7 @@ package com.museosmart.iot.influx;
 import com.museosmart.entity.MedicionPendiente;
 import com.museosmart.iot.IotInfluxProperties;
 import com.museosmart.repository.MedicionPendienteRepository;
+import com.museosmart.repository.redis.EstadoSensorRedisRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -26,13 +27,16 @@ public class MedicionEnvioService {
     private final MedicionPendienteRepository repository;
     private final InfluxEscritor escritor;
     private final IotInfluxProperties propiedades;
+    private final EstadoSensorRedisRepository estadoSensorRedis;
 
     public MedicionEnvioService(MedicionPendienteRepository repository,
                                 InfluxEscritor escritor,
-                                IotInfluxProperties propiedades) {
+                                IotInfluxProperties propiedades,
+                                EstadoSensorRedisRepository estadoSensorRedis) {
         this.repository = repository;
         this.escritor = escritor;
         this.propiedades = propiedades;
+        this.estadoSensorRedis = estadoSensorRedis;
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -48,6 +52,7 @@ public class MedicionEnvioService {
             medicion.setUltimoError(null);
             medicion.setProximoIntentoEn(null);
             repository.save(medicion);
+            sincronizarEstadoRedis(medicion, "ENVIADO");
         } catch (RuntimeException ex) {
             int intentos = medicion.getIntentos() + 1;
             medicion.setIntentos(intentos);
@@ -62,7 +67,22 @@ public class MedicionEnvioService {
                 log.debug("Medicion {} fallo (intento {}); se reintentara", id, intentos);
             }
             repository.save(medicion);
+            sincronizarEstadoRedis(medicion, medicion.getEstado());
         }
+    }
+
+    /**
+     * Mantiene el estado del outbox en el hash de Redis de la ultima lectura,
+     * de modo que el panel (que lee Redis) muestre el mismo estado que
+     * PostgreSQL. Es un extra tolerante: si Redis falla, no afecta al drenado.
+     */
+    private void sincronizarEstadoRedis(MedicionPendiente medicion, String estado) {
+        if (medicion.getSensor() == null || medicion.getSensor().getCodigo() == null) {
+            return;
+        }
+        estadoSensorRedis.actualizarEstado(
+                medicion.getSensor().getCodigo(), medicion.getMetrica(),
+                medicion.getMedidoEn(), estado);
     }
 
     private String recortar(String texto) {

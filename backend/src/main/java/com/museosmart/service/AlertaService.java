@@ -5,11 +5,14 @@ import com.museosmart.entity.Exhibicion;
 import com.museosmart.entity.Sensor;
 import com.museosmart.repository.AlertaRepository;
 import com.museosmart.repository.ExhibicionRepository;
+import com.museosmart.repository.redis.AlertaRedisRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -33,10 +36,13 @@ public class AlertaService {
 
     private final AlertaRepository alertaRepository;
     private final ExhibicionRepository exhibicionRepository;
+    private final AlertaRedisRepository alertaRedis;
 
-    public AlertaService(AlertaRepository alertaRepository, ExhibicionRepository exhibicionRepository) {
+    public AlertaService(AlertaRepository alertaRepository, ExhibicionRepository exhibicionRepository,
+                         AlertaRedisRepository alertaRedis) {
         this.alertaRepository = alertaRepository;
         this.exhibicionRepository = exhibicionRepository;
+        this.alertaRedis = alertaRedis;
     }
 
     /**
@@ -102,6 +108,7 @@ public class AlertaService {
                 max != null ? max.toPlainString() : "-"));
         alertaRepository.save(alerta);
         log.info("Alerta AMBIENTAL abierta para {} ({})", sensor.getCodigo(), metrica);
+        sincronizarRedisTrasCommit(alerta, true);
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
@@ -109,6 +116,7 @@ public class AlertaService {
         alerta.setEstado(Alerta.ESTADO_RESUELTA);
         alerta.setResueltaEn(OffsetDateTime.now());
         alertaRepository.save(alerta);
+        sincronizarRedisTrasCommit(alerta, false);
     }
 
     @Transactional(readOnly = true)
@@ -132,7 +140,6 @@ public class AlertaService {
         }
         return alerta;
     }
-
     private static BigDecimal max(BigDecimal actual, BigDecimal candidato, boolean minimo) {
         if (candidato == null) {
             return actual;
@@ -144,5 +151,40 @@ public class AlertaService {
             return candidato.compareTo(actual) < 0 ? candidato : actual; // el menor de los minimos
         }
         return candidato.compareTo(actual) > 0 ? candidato : actual; // el mayor de los maximos
+    }
+
+    /**
+     * Numero de alertas activas (ABIERTA/RECONOCIDA). Lee de Redis; si Redis no
+     * responde, lo cuenta en PostgreSQL. Es el dato de la campana del panel.
+     */
+    @Transactional(readOnly = true)
+    public long contarAbiertas() {
+        return alertaRedis.contarAbiertas()
+                .orElseGet(() -> alertaRepository.countByEstado(Alerta.ESTADO_ABIERTA)
+                        + alertaRepository.countByEstado(Alerta.ESTADO_RECONOCIDA));
+    }
+
+    /**
+     * Mantiene el conjunto de alertas activas de Redis tras confirmar la
+     * transaccion (nunca refleja una alerta que la base revirtio).
+     */
+    private void sincronizarRedisTrasCommit(Alerta alerta, boolean activa) {
+        Runnable accion = () -> {
+            if (activa) {
+                alertaRedis.marcarActiva(alerta.getId());
+            } else {
+                alertaRedis.marcarResuelta(alerta.getId());
+            }
+        };
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    accion.run();
+                }
+            });
+        } else {
+            accion.run();
+        }
     }
 }
