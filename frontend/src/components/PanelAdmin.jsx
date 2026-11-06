@@ -27,6 +27,7 @@ import Popularidad from './Popularidad'
 import Administradores from './Administradores'
 import PaginaEdicionExhibicion from './PaginaEdicionExhibicion'
 import MiPerfil from './MiPerfil'
+import Simulador from './Simulador'
 
 import './PanelAdmin.css'
 
@@ -61,6 +62,7 @@ const leerSeccionDeHash = () => {
   if (hash === '#/admin/monitoreo') return 'monitoreo'
   if (hash === '#/admin/alertas') return 'alertas'
   if (hash === '#/admin/popularidad') return 'popularidad'
+  if (hash === '#/admin/simulador') return 'simulador'
   if (hash === '#/admin/administradores') return 'administradores'
   if (hash === '#/admin/perfil') return 'perfil'
   return 'inicio'
@@ -390,6 +392,8 @@ export default function PanelAdmin({ sesion, onCerrarSesion, onVolverAlMuseo }) 
           {seccionActual === 'alertas' && <Alertas />}
 
           {seccionActual === 'popularidad' && <Popularidad />}
+
+          {seccionActual === 'simulador' && <Simulador sesion={sesion} />}
 
           {seccionActual === 'administradores' && <Administradores sesion={sesion} />}
 

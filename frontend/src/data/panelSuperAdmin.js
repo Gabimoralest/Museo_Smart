@@ -23,6 +23,7 @@ export const secciones = [
   { id: 'monitoreo', etiqueta: 'Monitoreo IoT', icono: 'sensor', ruta: '#/admin/monitoreo' },
   { id: 'alertas', etiqueta: 'Alertas', icono: 'alerta', ruta: '#/admin/alertas' },
   { id: 'popularidad', etiqueta: 'Popularidad', icono: 'analitica', ruta: '#/admin/popularidad' },
+  { id: 'simulador', etiqueta: 'Simulador', icono: 'sensor', soloSuperAdmin: true, ruta: '#/admin/simulador' },
   { id: 'administradores', etiqueta: 'Administradores', icono: 'admin', soloSuperAdmin: true, corona: true, ruta: '#/admin/administradores' },
   { id: 'perfil', etiqueta: 'Mi perfil', icono: 'perfil', ruta: '#/admin/perfil' },
 ]

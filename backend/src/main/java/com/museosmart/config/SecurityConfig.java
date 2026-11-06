@@ -97,6 +97,11 @@ public class SecurityConfig {
                         // Debe ir antes de anyRequest() para que no quede anulada.
                         .requestMatchers("/api/v1/admin/usuarios/**").hasRole("SUPERADMIN")
 
+                        // Escenarios del simulador (solo si APP_SIMULADOR_HABILITADO=true):
+                        // SOLO SUPERADMIN. Con el flag en false el controlador no existe
+                        // y la ruta cae en anyRequest(), por lo que no se expone nada.
+                        .requestMatchers("/api/v1/admin/simulador/**").hasRole("SUPERADMIN")
+
                         // Cualquier otra ruta requiere autenticacion.
                         .anyRequest().authenticated()
                 )
